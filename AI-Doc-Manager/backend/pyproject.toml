@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dms-backend-foundation"
+version = "0.1.0"
+description = "Minimal FastAPI backend foundation for a document management system."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "alembic>=1.14.0,<2.0.0",
+  "fastapi>=0.115.0,<1.0.0",
+  "minio>=7.2.8,<8.0.0",
+  "passlib>=1.7.4,<2.0.0",
+  "psycopg[binary]>=3.2.0,<4.0.0",
+  "pydantic-settings>=2.6.0,<3.0.0",
+  "PyJWT>=2.9.0,<3.0.0",
+  "sqlalchemy>=2.0.36,<3.0.0",
+  "uvicorn[standard]>=0.32.0,<1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.28.0,<1.0.0",
+  "pytest>=8.3.0,<9.0.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+addopts = "-p no:cacheprovider"
+norecursedirs = [".pytest_cache", "pytest-cache-files-*"]
+pythonpath = ["."]
+testpaths = ["app/tests"]

@@ -1,0 +1,1 @@
+"""Vectorization domain placeholders."""
