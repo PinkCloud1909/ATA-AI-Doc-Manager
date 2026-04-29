@@ -11,14 +11,14 @@ export default function StatusChart() {
               Số lượng tài liệu phân bổ theo thang điểm 0-10
             </p>
           </div>
-          <div className="flex gap-2">
+          {/*<div className="flex gap-2">
             <button className="px-3 py-1 text-[10px] font-bold bg-surface-container text-on-surface rounded-full">
               30 ngày
             </button>
             <button className="px-3 py-1 text-[10px] font-bold text-on-surface-variant hover:bg-surface-container rounded-full">
               90 ngày
             </button>
-          </div>
+          </div>*/}
         </div>
         <div className="h-64 flex items-end gap-2 md:gap-4 px-2">
           <div className="flex-1 group relative">

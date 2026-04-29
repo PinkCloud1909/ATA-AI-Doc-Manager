@@ -11,7 +11,7 @@ export default function Header() {
         <div className="md:hidden text-lg font-bold tracking-tighter text-on-surface">
           Architect SOC
         </div>
-        <div className="hidden md:flex items-center gap-6">
+        {/* <div className="hidden md:flex items-center gap-6">
           <a
             className="text-on-surface font-semibold border-b-2 border-on-surface text-sm pb-1"
             href="#"
@@ -24,7 +24,7 @@ export default function Header() {
           >
             Logs
           </a>
-        </div>
+        </div> */}
       </div>
       <div className="flex items-center gap-4">
         <div className="hidden sm:flex items-center bg-surface-container-low px-3 py-1.5 rounded-md">
