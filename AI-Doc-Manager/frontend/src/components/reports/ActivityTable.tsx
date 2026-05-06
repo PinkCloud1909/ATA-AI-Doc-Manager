@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 
 // 1. Định nghĩa kiểu dữ liệu cho một Hoạt động
 interface ActivityItem {
@@ -77,9 +78,12 @@ export default function ActivityTable() {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-lg font-bold text-on-surface">Hoạt động gần đây</h2>
-        <button className="text-tertiary text-xs font-bold hover:underline transition-all">
+        <Link
+          href="/dashboard/activities"
+          className="text-tertiary text-xs font-bold hover:underline transition-all"
+        >
           Xem tất cả
-        </button>
+        </Link>
       </div>
 
       {/* Danh sách Activity */}
