@@ -159,10 +159,10 @@ export default function DocumentTable({
                     </Link>
                     <button
                       className="p-2 hover:bg-surface-container-low rounded-lg text-neutral-500 transition-colors"
-                      title="So sánh"
+                      title="Chỉnh sửa"
                     >
                       <span className="material-symbols-outlined text-[18px]">
-                        compare_arrows
+                        edit
                       </span>
                     </button>
                     <button

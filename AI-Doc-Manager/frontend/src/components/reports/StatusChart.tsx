@@ -75,6 +75,16 @@ export default function StatusChart() {
               cy="80"
               fill="transparent"
               r="70"
+              stroke="#c1c1c1"
+              stroke-dasharray="440"
+              stroke-dashoffset="20"
+              stroke-width="20"
+            ></circle>
+            <circle
+              cx="80"
+              cy="80"
+              fill="transparent"
+              r="70"
               stroke="#5e5e5e"
               stroke-dasharray="440"
               stroke-dashoffset="44"
@@ -106,7 +116,7 @@ export default function StatusChart() {
               <span className="w-3 h-3 rounded-full bg-tertiary"></span>
               <span className="text-sm text-on-surface-variant">Approved</span>
             </div>
-            <span className="text-sm font-bold text-on-surface">65%</span>
+            <span className="text-sm font-bold text-on-surface">60%</span>
           </div>
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
@@ -121,6 +131,13 @@ export default function StatusChart() {
               <span className="text-sm text-on-surface-variant">Draft</span>
             </div>
             <span className="text-sm font-bold text-on-surface">10%</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-surface-container"></span>
+              <span className="text-sm text-on-surface-variant">Rejected</span>
+            </div>
+            <span className="text-sm font-bold text-on-surface">5%</span>
           </div>
         </div>
       </div>
