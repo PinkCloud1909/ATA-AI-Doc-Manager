@@ -1,30 +1,30 @@
 # ── Web framework ─────────────────────────────────────────────────────────────
-fastapi==0.111.0
-uvicorn[standard]==0.29.0
-python-multipart==0.0.9
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
 
 # ── Database ──────────────────────────────────────────────────────────────────
-sqlalchemy==2.0.30
-alembic==1.13.1
-asyncpg==0.29.0                  # async PostgreSQL driver (Cloud SQL)
-cloud-sql-python-connector[asyncpg]==1.9.0  # Google Cloud SQL Connector
+sqlalchemy>=2.0.30
+alembic>=1.13.1
+asyncpg>=0.29.0                                 # async PostgreSQL driver (Cloud SQL)
+cloud-sql-python-connector[asyncpg]>=1.6.0      # Google Cloud SQL Connector
 
 # ── Google Cloud ──────────────────────────────────────────────────────────────
-google-auth==2.29.0
-google-cloud-aiplatform==1.52.0  # Vertex AI SDK (Gemini + Vector Search)
-google-cloud-storage==2.16.0     # GCS
-firebase-admin==6.5.0            # Verify Firebase ID Token
+google-cloud-aiplatform>=1.50.0                 # Vertex AI SDK (Đã bao gồm cả module vertexai)
+google-cloud-storage>=2.16.0                    # GCS
+firebase-admin>=6.5.0                           # Verify Firebase ID Token
 
 # ── AI / ADK ──────────────────────────────────────────────────────────────────
-google-adk==0.3.0                # Google Agent Development Kit
-vertexai==1.52.0                 # Vertex AI convenience wrapper
+# Lưu ý: Nếu google-adk là thư viện nội bộ/Private, hãy giữ nguyên. 
+# Nếu đây là lỗi đánh máy, thường mọi người hay dùng langchain-google-vertexai
+google-adk>=1.30.0                              
 
 # ── Validation & config ───────────────────────────────────────────────────────
-pydantic==2.7.1
-pydantic-settings==2.2.1
-python-jose[cryptography]==3.3.0
+pydantic>=2.7.0
+pydantic-settings>=2.2.0
+python-jose[cryptography]>=3.3.0                # 3.3.0 là phiên bản public ổn định nhất
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
-httpx==0.27.0
-tenacity==8.3.0                  # retry logic cho Vertex AI calls
-structlog==24.1.0                # structured logging cho Cloud Logging
+httpx>=0.27.0
+tenacity>=8.3.0                                 # retry logic cho Vertex AI calls
+structlog>=24.1.0                               # structured logging cho Cloud Logging
