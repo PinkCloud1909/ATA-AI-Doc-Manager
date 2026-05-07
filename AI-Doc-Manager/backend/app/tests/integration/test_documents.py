@@ -1,0 +1,356 @@
+import io
+import uuid
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from app.modules.documents.domain.models import Document
+from app.shared.enums import DocumentType, Status
+from app.shared.utils import utcnow
+
+
+MOCK_FILE_LINK = "minio://documents/documents/2026/05/01/abc123-test.pdf"
+MOCK_DOWNLOAD_URL = "http://localhost:9000/documents/documents/2026/05/01/abc123-test.pdf?presigned=1"
+
+
+def _login_admin(client) -> str:
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin123"},
+    )
+    assert response.status_code == 200
+    return response.json()["access_token"]
+
+
+def _auth_header(token: str) -> dict:
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _create_test_document(db_session, user_id=None) -> Document:
+    """Insert a document directly into the DB for testing."""
+    now = utcnow()
+    doc = Document(
+        document_group_id=uuid.uuid4(),
+        version=1,
+        document_type=DocumentType.REPORT,
+        status=Status.DRAFT,
+        title="Test Document",
+        description="A test document",
+        original_filename="test.pdf",
+        file_link=MOCK_FILE_LINK,
+        file_size=1024,
+        content_type="application/pdf",
+        created_by=user_id,
+        created_at=now,
+        modified_by=user_id,
+        modified_date=now,
+    )
+    db_session.add(doc)
+    db_session.commit()
+    return doc
+
+
+class TestUploadDocument:
+    @patch("app.modules.documents.api.router._get_storage")
+    def test_upload_success(self, mock_get_storage, client, db_session):
+        mock_adapter = MagicMock()
+        mock_adapter.build_object_key.return_value = "documents/2026/05/01/abc-test.pdf"
+        mock_adapter.upload_fileobj.return_value = MOCK_FILE_LINK
+        mock_get_storage.return_value = mock_adapter
+
+        token = _login_admin(client)
+        file_data = b"fake pdf content"
+        response = client.post(
+            "/api/v1/documents/upload",
+            headers=_auth_header(token),
+            files={"file": ("test.pdf", io.BytesIO(file_data), "application/pdf")},
+            data={"document_type": "report", "title": "My Report"},
+        )
+
+        assert response.status_code == 201
+        payload = response.json()
+        assert payload["title"] == "My Report"
+        assert payload["original_filename"] == "test.pdf"
+        assert payload["document_type"] == "report"
+        assert payload["status"] == "draft"
+        assert payload["version"] == 1
+        assert payload["file_size"] == len(file_data)
+
+    @patch("app.modules.documents.api.router._get_storage")
+    def test_upload_default_title(self, mock_get_storage, client):
+        mock_adapter = MagicMock()
+        mock_adapter.build_object_key.return_value = "documents/2026/05/01/abc-test.pdf"
+        mock_adapter.upload_fileobj.return_value = MOCK_FILE_LINK
+        mock_get_storage.return_value = mock_adapter
+
+        token = _login_admin(client)
+        response = client.post(
+            "/api/v1/documents/upload",
+            headers=_auth_header(token),
+            files={"file": ("report.pdf", io.BytesIO(b"data"), "application/pdf")},
+            data={"document_type": "report"},
+        )
+
+        assert response.status_code == 201
+        assert response.json()["title"] == "report.pdf"
+
+    def test_upload_requires_auth(self, client):
+        response = client.post(
+            "/api/v1/documents/upload",
+            files={"file": ("test.pdf", io.BytesIO(b"data"), "application/pdf")},
+        )
+        assert response.status_code == 401
+
+
+class TestListDocuments:
+    def test_list_empty(self, client, db_session):
+        token = _login_admin(client)
+        response = client.get(
+            "/api/v1/documents",
+            headers=_auth_header(token),
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["items"] == []
+        assert payload["total"] == 0
+        assert payload["page"] == 1
+
+    def test_list_with_documents(self, client, db_session):
+        _create_test_document(db_session)
+        _create_test_document(db_session)
+
+        token = _login_admin(client)
+        response = client.get(
+            "/api/v1/documents",
+            headers=_auth_header(token),
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["total"] == 2
+        assert len(payload["items"]) == 2
+
+    def test_list_filter_by_status(self, client, db_session):
+        doc = _create_test_document(db_session)
+        doc.status = Status.APPROVED
+        db_session.commit()
+
+        _create_test_document(db_session)  # DRAFT
+
+        token = _login_admin(client)
+        response = client.get(
+            "/api/v1/documents",
+            headers=_auth_header(token),
+            params={"status_filter": "draft"},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["total"] == 1
+
+    def test_list_pagination(self, client, db_session):
+        for _ in range(5):
+            _create_test_document(db_session)
+
+        token = _login_admin(client)
+        response = client.get(
+            "/api/v1/documents",
+            headers=_auth_header(token),
+            params={"page": 1, "page_size": 2},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["total"] == 5
+        assert len(payload["items"]) == 2
+        assert payload["page"] == 1
+        assert payload["page_size"] == 2
+
+
+class TestGetDocument:
+    @patch("app.modules.documents.api.router._get_storage")
+    def test_get_detail(self, mock_get_storage, client, db_session):
+        mock_adapter = MagicMock()
+        mock_adapter.generate_presigned_download_url.return_value = MOCK_DOWNLOAD_URL
+        mock_get_storage.return_value = mock_adapter
+
+        doc = _create_test_document(db_session)
+        token = _login_admin(client)
+        response = client.get(
+            f"/api/v1/documents/{doc.id}",
+            headers=_auth_header(token),
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["document_id"] == str(doc.id)
+        assert payload["title"] == "Test Document"
+        assert payload["download_url"] == MOCK_DOWNLOAD_URL
+
+    def test_get_not_found(self, client, db_session):
+        token = _login_admin(client)
+        response = client.get(
+            f"/api/v1/documents/{uuid.uuid4()}",
+            headers=_auth_header(token),
+        )
+        assert response.status_code == 404
+
+
+class TestUpdateDocument:
+    def test_update_metadata(self, client, db_session):
+        doc = _create_test_document(db_session)
+        token = _login_admin(client)
+        response = client.put(
+            f"/api/v1/documents/{doc.id}",
+            headers=_auth_header(token),
+            json={"title": "Updated Title", "document_type": "policy"},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["title"] == "Updated Title"
+        assert payload["document_type"] == "policy"
+
+    def test_update_non_draft_fails(self, client, db_session):
+        doc = _create_test_document(db_session)
+        doc.status = Status.APPROVED
+        db_session.commit()
+
+        token = _login_admin(client)
+        response = client.put(
+            f"/api/v1/documents/{doc.id}",
+            headers=_auth_header(token),
+            json={"title": "Should Fail"},
+        )
+
+        assert response.status_code == 409
+
+
+class TestSoftDeleteDocument:
+    def test_archive_document(self, client, db_session):
+        doc = _create_test_document(db_session)
+        token = _login_admin(client)
+        response = client.delete(
+            f"/api/v1/documents/{doc.id}",
+            headers=_auth_header(token),
+        )
+
+        assert response.status_code == 200
+        assert response.json()["detail"] == "Document archived successfully"
+
+    def test_archive_already_archived(self, client, db_session):
+        doc = _create_test_document(db_session)
+        doc.status = Status.ARCHIVED
+        db_session.commit()
+
+        token = _login_admin(client)
+        response = client.delete(
+            f"/api/v1/documents/{doc.id}",
+            headers=_auth_header(token),
+        )
+
+        assert response.status_code == 409
+
+
+class TestHardDeleteDocument:
+    @patch("app.modules.documents.api.router._get_storage")
+    def test_permanent_delete(self, mock_get_storage, client, db_session):
+        mock_adapter = MagicMock()
+        mock_get_storage.return_value = mock_adapter
+
+        doc = _create_test_document(db_session)
+        doc_id = doc.id
+        token = _login_admin(client)
+        response = client.delete(
+            f"/api/v1/documents/{doc_id}/permanent",
+            headers=_auth_header(token),
+        )
+
+        assert response.status_code == 200
+        assert response.json()["detail"] == "Document permanently deleted"
+
+
+class TestNewVersion:
+    @patch("app.modules.documents.api.router._get_storage")
+    def test_create_new_version(self, mock_get_storage, client, db_session):
+        mock_adapter = MagicMock()
+        mock_adapter.build_object_key.return_value = "documents/2026/05/01/abc-v2.pdf"
+        mock_adapter.upload_fileobj.return_value = MOCK_FILE_LINK
+        mock_get_storage.return_value = mock_adapter
+
+        doc = _create_test_document(db_session)
+        token = _login_admin(client)
+        response = client.post(
+            f"/api/v1/documents/{doc.id}/new-version",
+            headers=_auth_header(token),
+            files={"file": ("v2.pdf", io.BytesIO(b"v2 content"), "application/pdf")},
+        )
+
+        assert response.status_code == 201
+        payload = response.json()
+        assert payload["version"] == 2
+        assert payload["document_group_id"] == str(doc.document_group_id)
+        assert payload["title"] == "Test Document"  # inherits from source
+
+    @patch("app.modules.documents.api.router._get_storage")
+    def test_new_version_with_custom_title(self, mock_get_storage, client, db_session):
+        mock_adapter = MagicMock()
+        mock_adapter.build_object_key.return_value = "documents/2026/05/01/abc-v2.pdf"
+        mock_adapter.upload_fileobj.return_value = MOCK_FILE_LINK
+        mock_get_storage.return_value = mock_adapter
+
+        doc = _create_test_document(db_session)
+        token = _login_admin(client)
+        response = client.post(
+            f"/api/v1/documents/{doc.id}/new-version",
+            headers=_auth_header(token),
+            files={"file": ("v2.pdf", io.BytesIO(b"v2"), "application/pdf")},
+            data={"title": "Version 2 Title"},
+        )
+
+        assert response.status_code == 201
+        assert response.json()["title"] == "Version 2 Title"
+
+
+class TestWorkflowEndpoints:
+    """Ensure existing workflow endpoints still work with the updated code."""
+
+    def test_submit_document(self, client, db_session):
+        doc = _create_test_document(db_session)
+        token = _login_admin(client)
+        response = client.post(
+            f"/api/v1/documents/{doc.id}/submit",
+            headers=_auth_header(token),
+        )
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "pending_review"
+
+    def test_approve_document(self, client, db_session):
+        doc = _create_test_document(db_session)
+        doc.status = Status.PENDING_REVIEW
+        db_session.commit()
+
+        token = _login_admin(client)
+        response = client.post(
+            f"/api/v1/documents/{doc.id}/approve",
+            headers=_auth_header(token),
+        )
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "approved"
+
+    def test_reject_document(self, client, db_session):
+        doc = _create_test_document(db_session)
+        doc.status = Status.PENDING_REVIEW
+        db_session.commit()
+
+        token = _login_admin(client)
+        response = client.post(
+            f"/api/v1/documents/{doc.id}/reject",
+            headers=_auth_header(token),
+            json={"reason": "Needs revision"},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "rejected"
