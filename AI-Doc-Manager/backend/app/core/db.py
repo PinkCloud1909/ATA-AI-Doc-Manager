@@ -15,6 +15,34 @@ class Base(DeclarativeBase):
 @lru_cache
 def get_engine():
     settings = get_settings()
+    if settings.use_cloud_sql_connector:
+        if not (
+            settings.cloud_sql_connection_name
+            and settings.cloud_sql_db_user
+            and settings.cloud_sql_db_password
+            and settings.cloud_sql_db_name
+        ):
+            raise ValueError("Cloud SQL connector settings are incomplete")
+        from google.cloud.sql.connector import Connector
+
+        connector = Connector()
+
+        def getconn():
+            return connector.connect(
+                settings.cloud_sql_connection_name,
+                "pg8000",
+                user=settings.cloud_sql_db_user,
+                password=settings.cloud_sql_db_password,
+                db=settings.cloud_sql_db_name,
+            )
+
+        return create_engine(
+            "postgresql+pg8000://",
+            creator=getconn,
+            future=True,
+            pool_pre_ping=True,
+        )
+
     return create_engine(
         settings.database_url,
         future=True,

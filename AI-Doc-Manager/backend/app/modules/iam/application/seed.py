@@ -12,6 +12,8 @@ SEEDED_PRIVILEGES = [
     "POST:/api/v1/auth/login",
     "POST:/api/v1/auth/register",
     "GET:/api/v1/auth/me",
+    "POST:/api/v1/auth/logout",
+    "POST:/api/v1/auth/password-changed",
     "POST:/api/v1/documents/{document_id}/submit",
     "POST:/api/v1/documents/{document_id}/approve",
     "POST:/api/v1/documents/{document_id}/reject",
@@ -19,7 +21,11 @@ SEEDED_PRIVILEGES = [
     "POST:/api/v1/documents/{document_id}/reviews",
     "GET:/api/v1/documents/{document_id}/reviews",
 ]
-DEFAULT_USER_PRIVILEGES = ["GET:/api/v1/auth/me"]
+DEFAULT_USER_PRIVILEGES = [
+    "GET:/api/v1/auth/me",
+    "POST:/api/v1/auth/logout",
+    "POST:/api/v1/auth/password-changed",
+]
 
 
 def seed_iam_data(

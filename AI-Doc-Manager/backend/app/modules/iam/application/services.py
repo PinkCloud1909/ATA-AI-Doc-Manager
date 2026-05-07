@@ -12,6 +12,8 @@ from app.modules.iam.domain.principal import AuthenticatedUser
 from app.modules.iam.infrastructure.repositories import (
     get_privilege_by_role_and_endpoint,
     get_role_by_name,
+    get_user_by_email,
+    get_user_by_firebase_uid,
     get_user_by_id,
     get_user_by_username,
 )
@@ -137,3 +139,42 @@ def load_principal(session: Session, user_id: UUID) -> AuthenticatedUser:
         raise UnauthorizedError("Invalid authentication credentials")
 
     return build_principal(user)
+
+
+def get_or_create_firebase_user(
+    session: Session,
+    firebase_uid: str,
+    email: str | None,
+    display_name: str | None,
+) -> User:
+    user = get_user_by_firebase_uid(session, firebase_uid)
+    if user:
+        return user
+
+    fallback_username = display_name or email or f"user-{firebase_uid[:8]}"
+    existing_by_email = get_user_by_email(session, email) if email else None
+    if existing_by_email:
+        existing_by_email.firebase_uid = firebase_uid
+        session.flush()
+        return existing_by_email
+
+    default_role = _ensure_default_user_role(session)
+    user = User(
+        username=fallback_username,
+        email=email,
+        firebase_uid=firebase_uid,
+        password_hash=get_password_hash(firebase_uid),
+        last_password_changed=utcnow(),
+    )
+    session.add(user)
+    session.flush()
+    session.add(
+        UserRole(
+            user_id=user.id,
+            role_id=default_role.id,
+            assigned_by=None,
+            assigned_at=utcnow(),
+        )
+    )
+    session.flush()
+    return user

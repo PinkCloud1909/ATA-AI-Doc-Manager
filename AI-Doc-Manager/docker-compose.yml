@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   backend:
     build:
@@ -10,16 +8,9 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
     depends_on:
       postgres:
         condition: service_healthy
-      minio:
-        condition: service_started
-      minio-init:
-        condition: service_completed_successfully
     ports:
       - "8000:8000"
     command: >
@@ -42,7 +33,8 @@ services:
     env_file:
       - .env
     environment:
-      NEXT_PUBLIC_API_URL: http://backend:8000
+      NEXT_PUBLIC_API_URL: http://backend:8000/api/v1
+      BACKEND_URL: http://backend:8000
     depends_on:
       - backend
     ports:
@@ -54,9 +46,9 @@ services:
     image: postgres:16-alpine
     container_name: ai-doc-postgres
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: dms_backend
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
     volumes:
@@ -64,48 +56,13 @@ services:
     networks:
       - app-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d dms_backend"]
       interval: 5s
       timeout: 5s
       retries: 10
 
-  minio:
-    image: minio/minio:latest
-    container_name: ai-doc-minio
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - minio_data:/data
-    networks:
-      - app-network
-    command: server /data --console-address ":9001"
-
-  minio-init:
-    image: minio/mc:latest
-    container_name: ai-doc-minio-init
-    env_file:
-      - .env
-    depends_on:
-      - minio
-    networks:
-      - app-network
-    entrypoint: >
-      /bin/sh -c "
-      until /usr/bin/mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD; do
-        echo 'Waiting for MinIO...';
-        sleep 2;
-      done;
-      /usr/bin/mc mb --ignore-existing local/$$MINIO_BUCKET;
-      exit 0;
-      "
-
 volumes:
   postgres_data:
-  minio_data:
 
 networks:
   app-network:

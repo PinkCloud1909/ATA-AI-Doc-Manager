@@ -1,0 +1,44 @@
+# ========================
+# 1. Thư viện Node.js (Dependencies)
+# ========================
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn-debug.log
+pnpm-debug.log
+
+
+# ========================
+# 2. Next.js & Build (Thư mục chạy/build)
+# ========================
+.next/
+out/
+build/
+dist/
+
+# ========================
+# 3. Biến môi trường (MẬT KHẨU/API KEYS)
+# ========================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ========================
+# 4. Hệ điều hành (OS Files)
+# ========================
+.DS_Store
+*.pem
+Thumbs.db
+
+# ========================
+# 5. Trình soạn thảo & IDE (Editors)
+# ========================
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

@@ -1,3 +1,4 @@
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -19,8 +20,33 @@ class TokenResponse(BaseModel):
     expires_in: int
 
 
+class PrivilegeResponse(BaseModel):
+    id: UUID
+    role_id: UUID | None = None
+    api_endpoint: str
+    is_allowed: bool | None = None
+
+
+class RoleResponse(BaseModel):
+    id: UUID
+    role_name: str
+    description: str | None = None
+    privileges: list[PrivilegeResponse] = Field(default_factory=list)
+
+
+class UserRoleResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    role_id: UUID
+    role: RoleResponse
+    assigned_by: UUID | None = None
+    assigned_at: datetime | None = None
+
+
 class MeResponse(BaseModel):
     id: UUID
+    firebase_uid: str | None = None
     username: str
-    roles: list[str]
-    permissions: list[str]
+    email: str | None = None
+    last_password_changed: datetime | None = None
+    roles: list[UserRoleResponse]

@@ -19,6 +19,31 @@ def get_user_by_username(session: Session, username: str) -> User | None:
     return session.execute(stmt).unique().scalar_one_or_none()
 
 
+def get_user_by_firebase_uid(session: Session, firebase_uid: str) -> User | None:
+    stmt = (
+        select(User)
+        .options(
+            joinedload(User.user_roles)
+            .joinedload(UserRole.role)
+            .joinedload(Role.privileges)
+        )
+        .where(User.firebase_uid == firebase_uid)
+    )
+    return session.execute(stmt).unique().scalar_one_or_none()
+
+
+def get_user_by_email(session: Session, email: str) -> User | None:
+    stmt = (
+        select(User)
+        .options(
+            joinedload(User.user_roles)
+            .joinedload(UserRole.role)
+            .joinedload(Role.privileges)
+        )
+        .where(User.email == email)
+    )
+    return session.execute(stmt).unique().scalar_one_or_none()
+
 def get_user_by_id(session: Session, user_id: UUID) -> User | None:
     stmt = (
         select(User)

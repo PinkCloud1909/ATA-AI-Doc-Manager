@@ -10,8 +10,7 @@ def test_successful_register(client):
     assert response.status_code == 201
     payload = response.json()
     assert payload["username"] == "alice"
-    assert payload["roles"] == ["user"]
-    assert "GET:/api/v1/auth/me" in payload["permissions"]
+    assert payload["roles"][0]["role"]["role_name"] == "user"
 
 
 def test_register_duplicate_username(client):
@@ -74,8 +73,7 @@ def test_me_with_valid_token(client):
     assert response.status_code == 200
     payload = response.json()
     assert payload["username"] == "bob"
-    assert payload["roles"] == ["user"]
-    assert "GET:/api/v1/auth/me" in payload["permissions"]
+    assert payload["roles"][0]["role"]["role_name"] == "user"
 
 
 @pytest.mark.parametrize(

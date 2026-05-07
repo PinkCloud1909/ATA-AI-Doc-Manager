@@ -1,4 +1,6 @@
 from functools import lru_cache
+import os
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -26,12 +28,21 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 60
 
-    minio_endpoint: str = "localhost:9000"
-    minio_access_key: str = "minioadmin"
-    minio_secret_key: str = "minioadmin"
-    minio_secure: bool = False
-    minio_bucket: str = "documents"
-    minio_presigned_expiry_minutes: int = 15
+    gcp_project_id: str | None = None
+    gcp_region: str | None = None
+    gcs_bucket: str = "documents"
+    gcs_signed_url_expiry_minutes: int = 15
+
+    vertex_ai_location: str | None = None
+    vertex_ai_endpoint: str | None = None
+    vertex_ai_index_endpoint_id: str | None = None
+    vertex_ai_index_id: str | None = None
+
+    use_cloud_sql_connector: bool = False
+    cloud_sql_connection_name: str | None = None
+    cloud_sql_db_user: str | None = None
+    cloud_sql_db_password: str | None = None
+    cloud_sql_db_name: str | None = None
 
     default_admin_username: str = Field(default="admin", max_length=100)
     default_admin_password: str = Field(default="admin123", min_length=8)
