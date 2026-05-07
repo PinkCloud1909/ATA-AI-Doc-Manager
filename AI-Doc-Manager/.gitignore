@@ -28,7 +28,39 @@ frontend/node_modules/
 .yarn/cache
 .yarn/install-state.gz
 
-# Backend Python
+# backend_feature_chat Python
+backend_feature_chat/.venv/
+backend_feature_chat/venv/
+backend_feature_chat/__pycache__/
+backend_feature_chat/*.py[cod]
+backend_feature_chat/*$py.class
+backend_feature_chat/*.so
+backend_feature_chat/.Python
+backend_feature_chat/build/
+backend_feature_chat/develop-eggs/
+backend_feature_chat/dist/
+backend_feature_chat/downloads/
+backend_feature_chat/eggs/
+backend_feature_chat/.eggs/
+backend_feature_chat/lib/
+backend_feature_chat/lib64/
+backend_feature_chat/parts/
+backend_feature_chat/sdist/
+backend_feature_chat/var/
+backend_feature_chat/wheels/
+backend_feature_chat/pip-wheel-metadata/
+backend_feature_chat/share/python-wheels/
+backend_feature_chat/*.egg-info/
+backend_feature_chat/.installed.cfg
+backend_feature_chat/*.egg
+backend_feature_chat/MANIFEST
+backend_feature_chat/.pytest_cache/
+backend_feature_chat/.coverage
+backend_feature_chat/htmlcov/
+backend_feature_chat/.tox/
+backend_feature_chat/.hypothesis/
+backend_feature_chat/pytest-cache-files-*
+backend_feature_chat/.ruff_cache/
 backend/.venv/
 backend/venv/
 backend/__pycache__/
