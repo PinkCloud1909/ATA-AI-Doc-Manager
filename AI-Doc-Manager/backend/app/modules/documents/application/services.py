@@ -1,12 +1,15 @@
 import logging
+import uuid
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.modules.documents.domain.models import Document
-from app.shared.enums import Status
+from app.shared.interfaces import IObjectStorage
+from app.shared.enums import DocumentType, Status
 from app.shared.utils import utcnow
 
 logger = logging.getLogger(__name__)
@@ -20,6 +23,205 @@ def get_document_by_id(session: Session, document_id: UUID) -> Document:
         logger.warning("document_not_found", extra={"document_id": str(document_id)})
         raise NotFoundError("Document not found")
     return document
+
+
+def create_document(
+    session: Session,
+    *,
+    title: str,
+    original_filename: str,
+    file_link: str,
+    document_type: DocumentType,
+    user_id: UUID,
+    file_size: int | None = None,
+    content_type: str | None = None,
+    description: str | None = None,
+) -> Document:
+    now = utcnow()
+    document = Document(
+        document_group_id=uuid.uuid4(),
+        version=1,
+        document_type=document_type,
+        status=Status.DRAFT,
+        title=title,
+        description=description,
+        original_filename=original_filename,
+        file_link=file_link,
+        file_size=file_size,
+        content_type=content_type,
+        created_by=user_id,
+        created_at=now,
+        modified_by=user_id,
+        modified_date=now,
+    )
+    session.add(document)
+    session.commit()
+    logger.info(
+        "document_created",
+        extra={
+            "document_id": str(document.id),
+            "document_group_id": str(document.document_group_id),
+        },
+    )
+    return document
+
+
+def list_documents(
+    session: Session,
+    *,
+    page: int = 1,
+    page_size: int = 20,
+    status_filter: Status | None = None,
+    document_type_filter: DocumentType | None = None,
+    created_by_filter: UUID | None = None,
+) -> tuple[list[Document], int]:
+    query = select(Document)
+    count_query = select(func.count()).select_from(Document)
+
+    if status_filter is not None:
+        query = query.where(Document.status == status_filter)
+        count_query = count_query.where(Document.status == status_filter)
+    if document_type_filter is not None:
+        query = query.where(Document.document_type == document_type_filter)
+        count_query = count_query.where(Document.document_type == document_type_filter)
+    if created_by_filter is not None:
+        query = query.where(Document.created_by == created_by_filter)
+        count_query = count_query.where(Document.created_by == created_by_filter)
+
+    total = session.execute(count_query).scalar() or 0
+
+    offset = (page - 1) * page_size
+    query = query.order_by(Document.created_at.desc()).offset(offset).limit(page_size)
+    documents = session.execute(query).scalars().all()
+
+    return documents, total
+
+
+def get_document_detail(
+    session: Session,
+    document_id: UUID,
+    minio_adapter: IObjectStorage,
+) -> tuple[Document, str]:
+    document = get_document_by_id(session, document_id)
+    download_url = minio_adapter.generate_presigned_download_url(document.file_link)
+    return document, download_url
+
+
+def update_document_metadata(
+    session: Session,
+    document_id: UUID,
+    user_id: UUID,
+    *,
+    title: str | None = None,
+    description: str | None = None,
+    document_type: DocumentType | None = None,
+) -> Document:
+    document = get_document_by_id(session, document_id)
+    if document.status != Status.DRAFT:
+        raise ConflictError("Only draft documents can be updated")
+
+    now = utcnow()
+    if title is not None:
+        document.title = title
+    if description is not None:
+        document.description = description
+    if document_type is not None:
+        document.document_type = document_type
+    document.modified_by = user_id
+    document.modified_date = now
+    session.commit()
+    logger.info("document_updated", extra={"document_id": str(document_id)})
+    return document
+
+
+def archive_document(
+    session: Session,
+    document_id: UUID,
+    user_id: UUID,
+) -> Document:
+    document = get_document_by_id(session, document_id)
+    if document.status == Status.ARCHIVED:
+        raise ConflictError("Document is already archived")
+
+    now = utcnow()
+    document.status = Status.ARCHIVED
+    document.modified_by = user_id
+    document.modified_date = now
+    session.commit()
+    logger.info("document_archived", extra={"document_id": str(document_id)})
+    return document
+
+
+def delete_document_permanently(
+    session: Session,
+    document_id: UUID,
+    minio_adapter: IObjectStorage,
+) -> None:
+    document = get_document_by_id(session, document_id)
+    file_link = document.file_link
+
+    session.delete(document)
+    session.commit()
+
+    try:
+        minio_adapter.delete_object(file_link)
+    except Exception:
+        logger.warning(
+            "minio_delete_failed",
+            extra={"document_id": str(document_id), "file_link": file_link},
+        )
+
+    logger.info("document_deleted_permanently", extra={"document_id": str(document_id)})
+
+
+def create_new_version(
+    session: Session,
+    *,
+    source_document_id: UUID,
+    file_link: str,
+    original_filename: str,
+    user_id: UUID,
+    file_size: int | None = None,
+    content_type: str | None = None,
+    title: str | None = None,
+    description: str | None = None,
+) -> Document:
+    source = get_document_by_id(session, source_document_id)
+
+    max_version = session.execute(
+        select(func.max(Document.version)).where(
+            Document.document_group_id == source.document_group_id
+        )
+    ).scalar() or 0
+
+    now = utcnow()
+    new_doc = Document(
+        document_group_id=source.document_group_id,
+        version=max_version + 1,
+        document_type=source.document_type,
+        status=Status.DRAFT,
+        title=title or source.title,
+        description=description if description is not None else source.description,
+        original_filename=original_filename,
+        file_link=file_link,
+        file_size=file_size,
+        content_type=content_type,
+        created_by=user_id,
+        created_at=now,
+        modified_by=user_id,
+        modified_date=now,
+    )
+    session.add(new_doc)
+    session.commit()
+    logger.info(
+        "document_new_version",
+        extra={
+            "document_id": str(new_doc.id),
+            "document_group_id": str(new_doc.document_group_id),
+            "version": new_doc.version,
+        },
+    )
+    return new_doc
 
 
 def submit_document_for_review(

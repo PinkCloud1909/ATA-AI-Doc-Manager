@@ -21,17 +21,23 @@ class Settings(BaseSettings):
     database_url: str = (
         "postgresql+psycopg://postgres:postgres@localhost:5432/dms_backend"
     )
+    async_database_url: str = (
+        "postgresql+asyncpg://postgres:postgres@localhost:5432/dms_backend"
+    )
+    google_api_key: str | None = None
 
     jwt_secret_key: str = "change-me"
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 60
 
     minio_endpoint: str = "localhost:9000"
+    minio_external_endpoint: str | None = None
     minio_access_key: str = "minioadmin"
     minio_secret_key: str = "minioadmin"
     minio_secure: bool = False
     minio_bucket: str = "documents"
     minio_presigned_expiry_minutes: int = 15
+    max_upload_size_mb: int = 50
 
     default_admin_username: str = Field(default="admin", max_length=100)
     default_admin_password: str = Field(default="admin123", min_length=8)
