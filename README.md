@@ -1,48 +1,56 @@
 # AI-Doc-Manager
 
-Repo nay co mot thu muc con `AI-Doc-Manager/`. Day moi la thu muc chua source that cua du an.
+This repository contains the project source inside the `AI-Doc-Manager/` directory.
 
-Trang thai hien tai:
+Current status:
 
-- Backend FastAPI chay duoc bang Docker Compose trong `AI-Doc-Manager/backend/`.
-- PostgreSQL va MinIO duoc chay kem backend.
-- Frontend hien chua chay duoc vi cac file trong `AI-Doc-Manager/frontend/` dang rong, bao gom `package.json` va `Dockerfile`.
+- The backend can be run with Docker Compose from `AI-Doc-Manager/backend/`.
+- PostgreSQL and MinIO are included in the backend Docker Compose stack.
+- The frontend in `AI-Doc-Manager/frontend/` is currently incomplete on `master`, so the root Docker Compose stack should not be used yet.
 
-## Cach chay dung hien tai
+## Prerequisites
 
-1. Mo Docker Desktop va cho den khi Docker engine san sang.
+- Docker Desktop
+- Docker Compose
+- Python 3.11, only if you want to run the backend without Docker
 
-Kiem tra:
+Before starting the project, make sure Docker Desktop is running:
 
 ```powershell
 docker ps
 ```
 
-Neu lenh nay khong bao loi Docker engine thi tiep tuc.
+If this command returns a Docker engine connection error, open Docker Desktop and wait until it is ready.
 
-2. Chuyen vao thu muc backend:
+## Run The Backend
+
+From the repository root:
 
 ```powershell
-cd "G:\AT&A\Doc_M\ATA-AI-Doc-Manager\AI-Doc-Manager\backend"
+cd AI-Doc-Manager/backend
 ```
 
-3. Tao file moi truong neu chua co:
+Create the local environment file if it does not exist:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Neu file `.env` da ton tai, co the bo qua buoc nay.
+On macOS or Linux:
 
-4. Build va chay backend stack:
+```bash
+cp .env.example .env
+```
+
+Build and start the backend stack:
 
 ```powershell
 docker compose up -d --build
 ```
 
-Backend se tu dong chay migration va seed khi container `api` khoi dong.
+The `api` container automatically runs database migrations and seed data on startup.
 
-## Dia chi sau khi chay
+## Service URLs
 
 - Backend API: http://localhost:8000
 - Swagger Docs: http://localhost:8000/docs
@@ -51,74 +59,76 @@ Backend se tu dong chay migration va seed khi container `api` khoi dong.
 - MinIO API: http://localhost:9000
 - MinIO Console: http://localhost:9001
 
-Tai khoan mac dinh:
+Default admin account:
 
 ```text
 username: admin
 password: admin123
 ```
 
-## Lenh quan ly
+## Common Commands
 
-Xem container:
+Run these commands from `AI-Doc-Manager/backend/`.
+
+Check containers:
 
 ```powershell
 docker compose ps
 ```
 
-Xem log backend:
+View backend logs:
 
 ```powershell
 docker compose logs -f api
 ```
 
-Chay migration thu cong:
+Run migrations manually:
 
 ```powershell
 docker compose exec api alembic upgrade head
 ```
 
-Chay seed thu cong:
+Run seed data manually:
 
 ```powershell
 docker compose exec api python scripts/seed.py
 ```
 
-Dung cac container:
+Stop containers:
 
 ```powershell
 docker compose down
 ```
 
-Dung va xoa volume database/MinIO:
+Stop containers and remove database/MinIO volumes:
 
 ```powershell
 docker compose down -v
 ```
 
-## Luu y quan trong
+## Important Note About The Root Compose File
 
-Khong chay lenh nay o thoi diem hien tai:
+Do not run this from `AI-Doc-Manager/` on `master` yet:
 
 ```powershell
-cd "G:\AT&A\Doc_M\ATA-AI-Doc-Manager\AI-Doc-Manager"
 docker compose up --build
 ```
 
-Ly do: root compose co service `frontend`, nhung `frontend/Dockerfile` va `frontend/package.json` dang rong, nen frontend se khong build duoc.
+The root Compose file includes the frontend service, but the frontend on `master` is not ready to build yet.
 
-Neu chi can backend, luon chay trong:
+For backend-only development, always run Docker Compose from:
 
 ```text
-G:\AT&A\Doc_M\ATA-AI-Doc-Manager\AI-Doc-Manager\backend
+AI-Doc-Manager/backend/
 ```
 
-## Development backend khong dung Docker
+## Run The Backend Without Docker
 
-Chi dung cach nay neu ban da co PostgreSQL va MinIO dang chay rieng.
+Use this only if you already have PostgreSQL and MinIO running locally.
+
+From `AI-Doc-Manager/backend/`:
 
 ```powershell
-cd "G:\AT&A\Doc_M\ATA-AI-Doc-Manager\AI-Doc-Manager\backend"
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -e .[dev]
@@ -127,7 +137,18 @@ python scripts/seed.py
 uvicorn app.main:app --reload
 ```
 
-Backend se chay tai:
+On macOS or Linux:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+alembic upgrade head
+python scripts/seed.py
+uvicorn app.main:app --reload
+```
+
+The backend will be available at:
 
 ```text
 http://localhost:8000
