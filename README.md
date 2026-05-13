@@ -1,175 +1,134 @@
-# AI-Doc-Manager Monorepo
+# AI-Doc-Manager
 
-This repository combines:
+Repo nay co mot thu muc con `AI-Doc-Manager/`. Day moi la thu muc chua source that cua du an.
 
-- `backend/` — FastAPI backend (merged from `atna-doc-backend`)
-- `frontend/` — frontend application
-- `docker-compose.yml` — root orchestration for local development
+Trang thai hien tai:
 
-## Project Layout
+- Backend FastAPI chay duoc bang Docker Compose trong `AI-Doc-Manager/backend/`.
+- PostgreSQL va MinIO duoc chay kem backend.
+- Frontend hien chua chay duoc vi cac file trong `AI-Doc-Manager/frontend/` dang rong, bao gom `package.json` va `Dockerfile`.
 
-```text
-AI-Doc-Manager/
-├─ backend/
-├─ frontend/
-├─ docker-compose.yml
-└─ .env.example
+## Cach chay dung hien tai
+
+1. Mo Docker Desktop va cho den khi Docker engine san sang.
+
+Kiem tra:
+
+```powershell
+docker ps
 ```
 
-## Quick Start (root)
+Neu lenh nay khong bao loi Docker engine thi tiep tuc.
 
-1. Create environment file:
+2. Chuyen vao thu muc backend:
 
-```bash
-cp .env.example .env
+```powershell
+cd "G:\AT&A\Doc_M\ATA-AI-Doc-Manager\AI-Doc-Manager\backend"
 ```
 
-2. Build and run all services:
+3. Tao file moi truong neu chua co:
 
-```bash
-docker compose up --build
+```powershell
+Copy-Item .env.example .env
 ```
 
-3. Access services:
+Neu file `.env` da ton tai, co the bo qua buoc nay.
 
-- Frontend: http://localhost:3000
+4. Build va chay backend stack:
+
+```powershell
+docker compose up -d --build
+```
+
+Backend se tu dong chay migration va seed khi container `api` khoi dong.
+
+## Dia chi sau khi chay
+
 - Backend API: http://localhost:8000
+- Swagger Docs: http://localhost:8000/docs
+- Health check: http://localhost:8000/health
 - PostgreSQL: localhost:5432
 - MinIO API: http://localhost:9000
 - MinIO Console: http://localhost:9001
 
-To stop:
+Tai khoan mac dinh:
 
-```bash
+```text
+username: admin
+password: admin123
+```
+
+## Lenh quan ly
+
+Xem container:
+
+```powershell
+docker compose ps
+```
+
+Xem log backend:
+
+```powershell
+docker compose logs -f api
+```
+
+Chay migration thu cong:
+
+```powershell
+docker compose exec api alembic upgrade head
+```
+
+Chay seed thu cong:
+
+```powershell
+docker compose exec api python scripts/seed.py
+```
+
+Dung cac container:
+
+```powershell
 docker compose down
 ```
-inIO Console: http://localhost:9001
 
-## Migration + seed backend
+Dung va xoa volume database/MinIO:
 
-`backend` tự chạy migration + seed khi start. Chạy tay nếu cần:
-
-```bash
-docker compose exec backend alembic upgrade head
-docker compose exec backend python scripts/seed.py
+```powershell
+docker compose down -v
 ```
 
-Default admin:
-- username: `admin`
-- password: `admin123`
+## Luu y quan trong
 
----
+Khong chay lenh nay o thoi diem hien tai:
 
-## Development
+```powershell
+cd "G:\AT&A\Doc_M\ATA-AI-Doc-Manager\AI-Doc-Manager"
+docker compose up --build
+```
 
-### Backend (FastAPI)
+Ly do: root compose co service `frontend`, nhung `frontend/Dockerfile` va `frontend/package.json` dang rong, nen frontend se khong build duoc.
 
-Located in `./backend/`:
+Neu chi can backend, luon chay trong:
 
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # or: venv\Scripts\activate (Windows)
+```text
+G:\AT&A\Doc_M\ATA-AI-Doc-Manager\AI-Doc-Manager\backend
+```
+
+## Development backend khong dung Docker
+
+Chi dung cach nay neu ban da co PostgreSQL va MinIO dang chay rieng.
+
+```powershell
+cd "G:\AT&A\Doc_M\ATA-AI-Doc-Manager\AI-Doc-Manager\backend"
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 pip install -e .[dev]
 alembic upgrade head
 python scripts/seed.py
 uvicorn app.main:app --reload
 ```
 
-Backend starts at http://localhost:8000. Docs at `/docs`.
+Backend se chay tai:
 
-### Frontend (Next.js)
-
-Located in `./frontend/`:
-
-```bash
-cd frontend
-npm install
-npm run dev
+```text
+http://localhost:8000
 ```
-
-Frontend starts at http://localhost:3000. API URL configured via `NEXT_PUBLIC_API_URL` env var.
-
-### Tests
-
-```bash
-# Backend tests
-cd backend && pytest tests/ -v
-
-# Frontend tests
-cd frontend && npm run test
-```
-
----
-
-## Structure
-
-```
-AI-Doc-Manager/
-├── backend/                  # FastAPI (from atna-doc-backend)
-│   ├── app/
-│   │   ├── core/            # Config, DB, security, dependencies
-│   │   ├── modules/         # Feature modules (IAM, documents, etc)
-│   │   ├── shared/          # Shared enums, schemas, utils
-│   │   └── tests/           # Unit & integration tests
-│   ├── pyproject.toml       # Dependencies
-│   ├── alembic.ini          # Migration config
-│   ├── Dockerfile
-│   └── scripts/             # Seed, utilities
-├── frontend/                # Next.js
-│   ├── src/
-│   │   ├── app/            # App Router pages
-│   │   ├── components/     # UI components
-│   │   ├── lib/            # API client, utilities
-│   │   ├── hooks/          # Custom hooks
-│   │   ├── stores/         # Zustand state
-│   │   └── types/          # TypeScript types
-│   ├── package.json
-│   ├── Dockerfile
-│   └── next.config.ts
-├── docker-compose.yml      # Orchestration
-├── .env.example            # Environment template
-├── .gitignore
-├── .dockerignore
-└── README.md               # This file
-```
-
----
-
-## Tech Stack
-
-- **Backend**: FastAPI, SQLAlchemy 2.0, Alembic, PostgreSQL, MinIO, JWT/RBAC
-- **Frontend**: Next.js (App Router), TypeScript, Tailwind CSS, Zustand, React Query
-- **Infrastructure**: Docker, Docker Compose, PostgreSQL, MinIO
-- **AI**: Gemini API (integration pending)
-
----
-
-## Environment Variables
-
-Copy `.env.example` to `.env` and customize:
-
-```bash
-# Frontend
-NEXT_PUBLIC_API_URL=http://localhost:8000
-
-# Backend
-JWT_SECRET_KEY=<your-secret-key>
-DATABASE_URL=postgresql+psycopg://postgres:postgres@postgres:5432/dms_backend
-
-# MinIO
-MINIO_ROOT_USER=minioadmin
-MINIO_ROOT_PASSWORD=minioadmin
-MINIO_BUCKET=documents
-```
-
-See `.env.example` for full list.
-
----
-
-## Notes
-
-- Do **not** commit `.env` to Git
-- On production, inject secrets via Kubernetes/Docker Secrets
-- Frontend API URL is resolved at runtime from `NEXT_PUBLIC_API_URL` env var
-- Backend migrations run automatically on startup (in Docker)
