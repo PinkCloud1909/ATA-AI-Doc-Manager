@@ -71,6 +71,15 @@ class MinioStorageAdapter(IObjectStorage):
         bucket_name, object_key = self._parse_reference(object_reference)
         self.client.remove_object(bucket_name=bucket_name, object_name=object_key)
 
+    def download_object(self, object_reference: str) -> bytes:
+        bucket_name, object_key = self._parse_reference(object_reference)
+        response = self.client.get_object(bucket_name=bucket_name, object_name=object_key)
+        try:
+            return response.read()
+        finally:
+            response.close()
+            response.release_conn()
+
     def build_object_key(self, filename: str, prefix: str = "documents") -> str:
         safe_name = safe_filename(filename)
         dated_prefix = datetime.utcnow().strftime("%Y/%m/%d")

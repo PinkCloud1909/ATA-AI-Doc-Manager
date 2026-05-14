@@ -7,29 +7,62 @@ from app.shared.interfaces import IVectorStore
 
 
 class ChromaVectorAdapter(IVectorStore):
+    """ChromaDB adapter for local/dev vector store.
+
+    Client selection priority:
+      1. HttpClient  — when ``chroma_host`` is configured (remote Chroma server).
+      2. EphemeralClient — when ``chroma_ephemeral=True`` (unit tests only; data is lost on restart).
+      3. PersistentClient — default; data survives restarts (recommended for local dev).
+
+    The collection is always created with:
+      - ``embedding_function=None``: embeddings are provided explicitly by the LLM adapter.
+      - ``hnsw:space=cosine``: cosine distance matches the normalized output of Google's
+        text-embedding-004 model and gives more intuitive similarity scores.
+    """
+
     def __init__(self, settings: Optional[Settings] = None) -> None:
         self.settings = settings or get_settings()
-        # Connect to ChromaDB (can be configured via settings to use http client or local ephemeral client)
-        if hasattr(self.settings, "chroma_host") and self.settings.chroma_host:
+
+        if self.settings.chroma_host:
             self.client = chromadb.HttpClient(
-                host=self.settings.chroma_host, port=getattr(self.settings, "chroma_port", 8000)
+                host=self.settings.chroma_host,
+                port=self.settings.chroma_port,
             )
-        else:
-            # Ephemeral memory-based for quick dev testing without external docker if host isn't provided
+        elif self.settings.chroma_ephemeral:
+            # In-memory only — data lost on restart. Use ONLY in tests.
             self.client = chromadb.EphemeralClient()
-            
-        collection_name = getattr(self.settings, "chroma_collection", "document_chunks")
-        self.collection = self.client.get_or_create_collection(name=collection_name)
+        else:
+            # Default: persist to disk so vectors survive process restarts.
+            # Without this, PostgreSQL marks documents as vectorized but ChromaDB
+            # has nothing — semantic search silently returns empty results.
+            self.client = chromadb.PersistentClient(
+                path=self.settings.chroma_persist_path
+            )
+
+        self.collection = self.client.get_or_create_collection(
+            name=self.settings.chroma_collection,
+            # We supply embeddings manually; do not let Chroma apply its own function.
+            embedding_function=None,
+            # Cosine distance suits normalized text embeddings (Google text-embedding-004).
+            # Must be set at collection creation time and cannot be changed later.
+            metadata={"hnsw:space": "cosine"},
+        )
 
     def upsert_document(
-        self, document_id: str, text_chunks: List[str], embeddings: List[List[float]], metadata: Optional[Dict] = None
+        self,
+        document_id: str,
+        text_chunks: List[str],
+        embeddings: List[List[float]],
+        metadata: Optional[Dict] = None,
     ) -> None:
         if not text_chunks:
             return
-            
+
         ids = [f"{document_id}_{i}" for i in range(len(text_chunks))]
-        # Metadata applies to all chunks, or can be individualized
-        metadatas = [metadata or {"document_id": document_id} for _ in text_chunks]
+        # Always include document_id and chunk_index for filtered deletes and
+        # for the QA agent to display source attribution.
+        base_meta = {**(metadata or {}), "document_id": document_id}
+        metadatas = [{**base_meta, "chunk_index": i} for i in range(len(text_chunks))]
 
         self.collection.upsert(
             documents=text_chunks,
@@ -38,20 +71,39 @@ class ChromaVectorAdapter(IVectorStore):
             ids=ids,
         )
 
-    def semantic_search(self, query_embedding: List[float], top_k: int = 5) -> List[Dict[str, Any]]:
-        results = self.collection.query(query_embeddings=[query_embedding], n_results=top_k)
-        
-        matches = []
+    def semantic_search(
+        self, query_embedding: List[float], top_k: int = 5
+    ) -> List[Dict[str, Any]]:
+        results = self.collection.query(
+            query_embeddings=[query_embedding],
+            n_results=top_k,
+            include=["documents", "metadatas", "distances"],
+        )
+
+        matches: List[Dict[str, Any]] = []
         if not results["documents"] or not results["documents"][0]:
             return matches
 
         for doc, meta, distance in zip(
-            results["documents"][0], results["metadatas"][0], results["distances"][0]
+            results["documents"][0],
+            results["metadatas"][0],
+            results["distances"][0],
         ):
-            matches.append({"text": doc, "metadata": meta, "score": distance})
-            
+            # With cosine distance space: distance ∈ [0, 2].
+            # Convert to cosine *similarity* ∈ [-1, 1] (higher = more similar).
+            # For normalized vectors (Google embeddings): similarity ≈ 1 - distance.
+            similarity = round(1.0 - distance, 6)
+            matches.append(
+                {
+                    "text": doc,
+                    "metadata": meta,
+                    "distance": distance,   # raw distance (lower = more similar)
+                    "score": similarity,    # cosine similarity (higher = more similar)
+                }
+            )
+
         return matches
 
     def delete_document(self, document_id: str) -> None:
-        # Assuming metadata contains document_id, Chroma lets us delete by where clause
+        """Remove all chunks belonging to *document_id* from the collection."""
         self.collection.delete(where={"document_id": document_id})

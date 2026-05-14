@@ -25,6 +25,11 @@ SEEDED_PRIVILEGES = [
     "GET:/api/v1/approvals/pending",
     "POST:/api/v1/documents/{document_id}/reviews",
     "GET:/api/v1/documents/{document_id}/reviews",
+    "POST:/api/v1/vectorization/{document_id}",
+    "DELETE:/api/v1/vectorization/{document_id}",
+    "GET:/api/v1/vectorization/{document_id}/status",
+    "POST:/api/v1/vectorization/bulk",
+    "POST:/qa/chat",
 ]
 DEFAULT_USER_PRIVILEGES = ["GET:/api/v1/auth/me"]
 

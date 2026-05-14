@@ -32,6 +32,11 @@ class IObjectStorage(ABC):
         pass
 
     @abstractmethod
+    def download_object(self, object_reference: str) -> bytes:
+        """Download the entire file content as bytes."""
+        pass
+
+    @abstractmethod
     def build_object_key(self, filename: str, prefix: str = "documents") -> str:
         pass
 
@@ -56,7 +61,21 @@ class ILLMProvider(ABC):
     """Port for LLM and Embedding models (e.g. Google AI Gemini, Vertex AI)."""
 
     @abstractmethod
-    def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
+    def generate_embeddings(
+        self,
+        texts: List[str],
+        task_type: str = "RETRIEVAL_DOCUMENT",
+    ) -> List[List[float]]:
+        """Generate embeddings for a list of texts.
+
+        Args:
+            texts: List of text strings to embed.
+            task_type: Embedding task type for optimization.
+                - ``RETRIEVAL_DOCUMENT`` — indexing corpus/document chunks (default).
+                - ``RETRIEVAL_QUERY``    — general semantic search query.
+                - ``QUESTION_ANSWERING`` — natural-language questions for QA.
+                - ``FACT_VERIFICATION`` — fact-checking statements.
+        """
         pass
 
     @abstractmethod

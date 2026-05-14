@@ -277,6 +277,10 @@ def approve_document(
     document.modified_by = user_id
     document.modified_date = now
     session.commit()
+
+    # Vectorization is triggered by the caller (router) as a background task
+    # to avoid blocking the HTTP response. See documents/api/router.py.
+    logger.info("document_approved", extra={"document_id": str(document_id)})
     return document, expired_documents
 
 

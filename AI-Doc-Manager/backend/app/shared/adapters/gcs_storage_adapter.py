@@ -48,6 +48,11 @@ class GCSStorageAdapter(IObjectStorage):
         if blob.exists():
             blob.delete()
 
+    def download_object(self, object_reference: str) -> bytes:
+        bucket_name, object_key = self._parse_reference(object_reference)
+        blob = self.client.bucket(bucket_name).blob(object_key)
+        return blob.download_as_bytes()
+
     def build_object_key(self, filename: str, prefix: str = "documents") -> str:
         safe_name = safe_filename(filename)
         dated_prefix = datetime.utcnow().strftime("%Y/%m/%d")

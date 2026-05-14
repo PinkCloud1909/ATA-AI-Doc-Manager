@@ -2,7 +2,7 @@ import logging
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -33,8 +33,12 @@ from app.modules.documents.application.services import (
     submit_document_for_review,
     update_document_metadata,
 )
-from app.shared.adapters.factory import get_object_storage
-from app.shared.interfaces import IObjectStorage
+from app.shared.adapters.factory import (
+    get_llm_provider,
+    get_object_storage,
+    get_vector_store,
+)
+from app.shared.interfaces import ILLMProvider, IObjectStorage, IVectorStore
 from app.modules.iam.domain.principal import AuthenticatedUser
 from app.shared.enums import DocumentType, Status
 
@@ -46,6 +50,14 @@ approvals_router = APIRouter(prefix="/api/v1/approvals", tags=["approvals"])
 
 def _get_storage() -> IObjectStorage:
     return get_object_storage()
+
+
+def _get_vectors() -> IVectorStore:
+    return get_vector_store()
+
+
+def _get_llm() -> ILLMProvider:
+    return get_llm_provider()
 
 
 def _build_action_response(document) -> DocumentActionResponse:
@@ -63,6 +75,44 @@ def _build_action_response(document) -> DocumentActionResponse:
         rejected_reason=document.rejected_reason,
         rejected_at=document.rejected_at,
     )
+
+
+def _background_vectorize(document_id: UUID) -> None:
+    """Background task: run vectorization pipeline for an approved document.
+
+    Creates its own DB session via session_scope() to avoid sharing a session
+    across threads. Errors are logged but do NOT affect the HTTP response.
+    """
+    from app.core.db import session_scope
+    from app.modules.vectorization.application.services import vectorize_document
+    from app.shared.adapters.factory import (
+        get_llm_provider as _llm,
+        get_object_storage as _storage,
+        get_vector_store as _vectors,
+    )
+
+    with session_scope() as session:
+        try:
+            result = vectorize_document(
+                session,
+                document_id=document_id,
+                storage=_storage(),
+                llm_provider=_llm(),
+                vector_store=_vectors(),
+            )
+            logger.info(
+                "background_vectorize_success",
+                extra={
+                    "document_id": str(document_id),
+                    "chunk_count": result.chunk_count,
+                    "processing_time_ms": result.processing_time_ms,
+                },
+            )
+        except Exception as exc:
+            logger.error(
+                "background_vectorize_failed",
+                extra={"document_id": str(document_id), "error": str(exc)},
+            )
 
 
 # --- Document CRUD ---
@@ -85,7 +135,8 @@ def upload_document(
     settings = get_settings()
     max_bytes = settings.max_upload_size_mb * 1024 * 1024
 
-    # Read file content to check size
+    # Read file content once for size check; seek back for upload.
+    # For production with very large files, consider streaming chunk-by-chunk.
     file_content = file.file.read()
     file_size = len(file_content)
     if file_size > max_bytes:
@@ -379,17 +430,30 @@ def submit_document(
     "/{document_id}/approve",
     response_model=DocumentActionResponse,
     status_code=status.HTTP_200_OK,
+    summary="Approve a document and trigger background vectorization",
 )
 def approve_document_route(
     document_id: UUID,
+    background_tasks: BackgroundTasks,
     current_user: Annotated[AuthenticatedUser, Depends(require_permission())],
     session: Annotated[Session, Depends(get_db_session)],
 ) -> DocumentActionResponse:
+    """Approve the document (synchronous) then schedule vectorization as a
+    non-blocking background task so the HTTP response is returned immediately.
+    """
     document, _expired = approve_document(
         session,
         document_id=document_id,
         user_id=current_user.id,
     )
+
+    # Non-blocking: vectorization runs after the response is sent.
+    background_tasks.add_task(_background_vectorize, document_id)
+    logger.info(
+        "vectorization_scheduled",
+        extra={"document_id": str(document_id)},
+    )
+
     return _build_action_response(document)
 
 

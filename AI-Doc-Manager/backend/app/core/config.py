@@ -44,6 +44,34 @@ class Settings(BaseSettings):
     default_admin_role_name: str = Field(default="admin", max_length=50)
     default_user_role_name: str = Field(default="user", max_length=50)
 
+    # Vectorization settings
+    chunk_size: int = 1000
+    chunk_overlap: int = 200
+    embedding_batch_size: int = 20
+
+    # ChromaDB settings
+    # Default port 8001 avoids conflict with FastAPI which runs on 8000
+    chroma_host: str | None = None
+    chroma_port: int = 8001
+    chroma_collection: str = "document_chunks"
+    # Path for PersistentClient (used when chroma_host is None and chroma_ephemeral is False).
+    # Relative paths are resolved from the working directory (project root).
+    chroma_persist_path: str = "./.chroma_data"
+    # Set to True ONLY in tests/dev where data loss on restart is acceptable.
+    chroma_ephemeral: bool = False
+
+    # GCP / Vertex AI settings (required when ENV=prod)
+    gcp_project_id: str | None = None
+    gcp_location: str = "us-central1"
+    vertex_index_id: str | None = None
+    vertex_index_endpoint_id: str | None = None
+    vertex_deployed_index_id: str | None = None
+
+    @property
+    def google_ai_api_key(self) -> str | None:
+        """Alias for google_api_key for backward compatibility."""
+        return self.google_api_key
+
 
 @lru_cache
 def get_settings() -> Settings:

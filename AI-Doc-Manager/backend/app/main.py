@@ -15,6 +15,7 @@ from app.modules.documents.api.router import approvals_router, documents_router
 from app.modules.iam.api.router import router as auth_router
 from app.modules.qa.api.router import router as qa_router
 from app.modules.reviews.api.router import router as reviews_router
+from app.modules.vectorization.api.router import router as vectorization_router
 from app.shared.schemas import HealthResponse, ReadyResponse
 from app.shared.utils import generate_request_id
 
@@ -30,17 +31,29 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     logger.info("application_shutdown")
 
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(
     title=settings.app_name,
     debug=settings.debug,
     lifespan=lifespan,
 )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 register_exception_handlers(app)
 app.include_router(auth_router)
 app.include_router(documents_router)
 app.include_router(approvals_router)
 app.include_router(reviews_router)
 app.include_router(qa_router)
+app.include_router(vectorization_router)
 
 
 @app.middleware("http")
