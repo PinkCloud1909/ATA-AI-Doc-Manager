@@ -18,17 +18,28 @@ import {
 } from "firebase/auth"
 
 const firebaseConfig = {
-  apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
-  authDomain:        process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,
-  projectId:         process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
-  storageBucket:     process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
-  appId:             process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
+  apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
+  authDomain:        process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "",
+  projectId:         process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "",
+  storageBucket:     process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "",
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "",
+  appId:             process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "",
 }
 
-// Singleton pattern — tránh khởi tạo nhiều lần khi Next.js hot-reload
-const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig)
-export const firebaseAuth = getAuth(firebaseApp)
+// Bọc logic khởi tạo vào hàm try/catch để không làm sập tiến trình build của Docker
+const initFirebaseAuth = () => {
+  try {
+    // Nếu chưa có app nào thì khởi tạo, có rồi thì lấy dùng lại
+    const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig)
+    return getAuth(firebaseApp)
+  } catch (error) {
+    console.warn("⚠️ Bỏ qua lỗi khởi tạo Firebase (Thường do đang build Docker hoặc chạy Mock Login).")
+    // Trả về một object rỗng để TypeScript và Next.js không bị crash
+    return {} as ReturnType<typeof getAuth>
+  }
+}
+
+export const firebaseAuth = initFirebaseAuth()
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -41,7 +52,7 @@ export async function signInAndGetToken(
   password: string,
 ): Promise<string> {
   const credential = await signInWithEmailAndPassword(firebaseAuth, email, password)
-  return credential.user.getIdToken()
+  return await credential.user.getIdToken()
 }
 
 /**
@@ -49,14 +60,18 @@ export async function signInAndGetToken(
  * Dùng trong Axios interceptor để luôn gửi token mới nhất.
  */
 export async function getCurrentIdToken(): Promise<string | null> {
+  // Tránh lỗi khi gọi thuộc tính trên object rỗng lúc build
+  if (!firebaseAuth || !firebaseAuth.currentUser) return null
+  
   const user = firebaseAuth.currentUser
-  if (!user) return null
   // forceRefresh = false → Firebase tự refresh nếu token còn < 5 phút
-  return user.getIdToken(false)
+  return await user.getIdToken(false)
 }
 
 export async function signOut(): Promise<void> {
-  await firebaseSignOut(firebaseAuth)
+  if (firebaseAuth && firebaseAuth.signOut) {
+    await firebaseSignOut(firebaseAuth)
+  }
 }
 
 /**
@@ -64,5 +79,8 @@ export async function signOut(): Promise<void> {
  * Dùng trong Providers để cập nhật store khi token mới được issue.
  */
 export function onTokenRefresh(callback: (user: User | null) => void) {
+  if (!firebaseAuth || !firebaseAuth.onIdTokenChanged) {
+    return () => {} // Trả về hàm rỗng nếu đang mock/build
+  }
   return onIdTokenChanged(firebaseAuth, callback)
 }

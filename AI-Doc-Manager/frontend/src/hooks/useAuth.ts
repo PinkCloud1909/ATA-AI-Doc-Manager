@@ -20,15 +20,8 @@ export function useAuth() {
       setUser(me)
       router.push("/dashboard")
     } catch (err: unknown) {
-      const code = (err as { code?: string })?.code
-      // Firebase error codes
-      const MSG: Record<string, string> = {
-        "auth/user-not-found":    "Email không tồn tại",
-        "auth/wrong-password":    "Mật khẩu không đúng",
-        "auth/too-many-requests": "Quá nhiều lần thử. Vui lòng thử lại sau",
-        "auth/invalid-email":     "Email không hợp lệ",
-      }
-      setError(MSG[code ?? ""] ?? "Đăng nhập thất bại")
+      const message = (err as Error)?.message
+      setError(message ?? "Đăng nhập thất bại")
     } finally {
       setIsLoading(false)
     }
@@ -46,15 +39,8 @@ export function useAuth() {
       setUser(me)
       router.push("/dashboard")
     } catch (err: unknown) {
-      const code = (err as { code?: string })?.code
-      // Firebase registration error codes
-      const MSG: Record<string, string> = {
-        "auth/email-already-in-use":  "Email này đã được sử dụng",
-        "auth/weak-password":         "Mật khẩu quá yếu (Cần ít nhất 6 ký tự)",
-        "auth/invalid-email":         "Email không hợp lệ",
-        "auth/operation-not-allowed": "Đăng ký bằng email đã bị vô hiệu hóa",
-      }
-      setError(MSG[code ?? ""] ?? "Đăng ký thất bại. Vui lòng thử lại.")
+      const message = (err as Error)?.message
+      setError(message ?? "Đăng ký thất bại. Vui lòng thử lại.")
     } finally {
       setIsLoading(false)
     }

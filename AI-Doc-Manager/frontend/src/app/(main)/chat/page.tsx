@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import MessageBubble from "@/components/chat/MessageBubble";
 import ChatInput from "@/components/chat/ChatInput";
 import ChatSidebar from "@/components/chat/ChatSidebar";
+import { useChatStore } from "@/stores/chatStore";
+import { useChat } from "@/hooks/useChat";
 
 // Định nghĩa cấu trúc 1 tin nhắn
 /*
@@ -227,7 +229,8 @@ const MOCK_CHAT_HISTORY: ChatMessage[] = [
 ];
 
 export default function ChatPage() {
-  const [messages, setMessages] = useState<ChatMessage[]>(MOCK_CHAT_HISTORY);
+  const { messages, isStreaming } = useChatStore();
+  const { sendMessage, stopStreaming } = useChat();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -239,50 +242,43 @@ export default function ChatPage() {
   }, [messages]);
 
   const handleSendMessage = (text: string) => {
-    const currentTime = new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
-    const newUserMsg: ChatMessage = {
-      id: Date.now().toString(),
-      role: "user",
-      text: text,
-      timestamp: currentTime,
-    };
-
-    setMessages((prev) => [...prev, newUserMsg]);
-
-    setTimeout(() => {
-      const aiResponse: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: "ai",
-        text: `Đang xử lý yêu cầu mới của bạn...`,
-        timestamp: new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        badgeType: "generated",
-      };
-      setMessages((prev) => [...prev, aiResponse]);
-    }, 1000);
+    sendMessage(text);
   };
 
   return (
-    <div className="flex h-full w-full overflow-hidden bg-background">
+    // THÊM RELATIVE VÀO DIV TỔNG ĐỂ CHAT SIDEBAR FLOAT ĐÚNG VỊ TRÍ
+    <div className="flex h-full w-full overflow-hidden bg-background relative">
+      {/* Sidebar nổi (Floating Sidebar) trên Mobile */}
       <ChatSidebar />
+
       <main className="flex-1 flex flex-col h-full relative overflow-hidden">
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto px-6 py-8 space-y-10 custom-scrollbar">
           {messages.map((msg) => (
             <MessageBubble
               key={msg.id}
-              role={msg.role}
-              timestamp={msg.timestamp}
-              badgeType={msg.badgeType}
+              role={msg.role === "user" ? "user" : "ai"}
+              timestamp={new Date(msg.timestamp).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+              badgeType={msg.is_from_kb ? "trusted" : "generated"}
             >
-              {/* Render trực tiếp ReactNode thay vì chỉ string */}
-              {msg.text}
+              <p className="text-[15px] leading-relaxed text-on-surface whitespace-pre-wrap">
+                {msg.content}
+              </p>
+              {msg.sources && msg.sources.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  <p className="text-sm font-semibold text-on-surface-variant">
+                    Nguồn tham khảo:
+                  </p>
+                  {msg.sources.map((source, idx) => (
+                    <div key={idx} className="text-xs text-on-surface-variant">
+                      {source.original_filename}
+                    </div>
+                  ))}
+                </div>
+              )}
             </MessageBubble>
           ))}
           <div ref={messagesEndRef} />

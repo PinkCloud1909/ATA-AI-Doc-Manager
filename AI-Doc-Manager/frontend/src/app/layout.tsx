@@ -1,22 +1,6 @@
 import type { Metadata } from "next";
-// Import 2 font nguyên bản của thiết kế từ thư viện tối ưu của Next.js
-import { Inter, Manrope } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
-
-// Cấu hình font Inter cho nội dung (body)
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
-
-// Cấu hình font Manrope cho các tiêu đề (heading)
-const manrope = Manrope({
-  subsets: ["latin"],
-  variable: "--font-manrope",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "Runbook Platform",
@@ -41,7 +25,7 @@ export default function RootLayout({
         - Dùng bg-background và text-on-surface để màu nền/chữ chuẩn theo Material Design 3
       */}
       <body
-        className={`${inter.variable} ${manrope.variable} font-body bg-background text-on-surface m-0 p-0 box-border`}
+        className="font-body bg-background text-on-surface m-0 p-0 box-border"
       >
         <Providers>{children}</Providers>
       </body>

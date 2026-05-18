@@ -25,9 +25,16 @@ export interface UserRole {
 
 export interface User {
   id:                   string
-  firebase_uid:         string   // Google UID từ Firebase
+  firebase_uid?:        string   // Chỉ có khi dùng Firebase Auth
   username:             string
-  email:                string
-  last_password_changed: string
-  roles:                UserRole[]
+  email?:               string
+  last_password_changed?: string
+  roles:                Array<UserRole | string>
+
+  // Optional fields for UI display and auth profile
+  displayName?:        string
+  photoURL?:           string
+  phoneNumber?:        string
+  role?:               string
+  permissions?:        string[]
 }

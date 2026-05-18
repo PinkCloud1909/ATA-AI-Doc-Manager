@@ -1,40 +1,52 @@
 /**
  * lib/api/auth.ts
  *
- * Với kiến trúc GCP, authentication flow:
- *  1. Firebase signIn (email/password hoặc Google SSO)
- *  2. Lấy Firebase ID Token
- *  3. Backend verify token qua google-auth-library
- *  4. Backend tra cứu User trong PostgreSQL theo firebase_uid
- *
- * Frontend không gọi /auth/login nữa — Firebase handle hoàn toàn.
- * Endpoint /auth/me dùng để lấy profile + roles từ PostgreSQL.
+ * Authentication flow hiện tại của backend:
+ *  1. POST /api/v1/auth/login bằng username/password
+ *  2. Backend trả JWT
+ *  3. Axios gửi JWT trong Authorization header cho các API cần auth
  */
 
 import apiClient from "./client"
 import { User } from "@/types/user"
-import {
-  signInAndGetToken,
-  signOut as firebaseSignOut,
-} from "@/lib/auth/firebase"
 import { mockLogin, mockMe } from "./auth.mock"
+import { clearStoredAccessToken, setStoredAccessToken } from "./authToken"
 
 // Mock mode: không cần Firebase hay backend
-const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== "false"
+const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === "true"
+
+interface TokenResponse {
+  access_token: string
+  token_type: string
+  expires_in: number
+}
+
+function normalizeUser(user: User): User {
+  return {
+    ...user,
+    displayName: user.displayName ?? user.username,
+    email: user.email ?? user.username,
+    role: user.role ?? (typeof user.roles?.[0] === "string" ? user.roles[0] : undefined),
+  }
+}
 
 export const authApi = {
   /**
-   * Đăng nhập - tự động dùng mock nếu NEXT_PUBLIC_USE_MOCK=true
+   * Đăng nhập - tự động dùng mock nếu NEXT_PUBLIC_USE_MOCK=true.
    */
-  login: async (email: string, password: string): Promise<User> => {
+  login: async (username: string, password: string): Promise<User> => {
     if (USE_MOCK) {
-      return mockLogin(email, password)
+      return mockLogin(username, password)
     }
-    // Bước 1: Firebase sign-in → lấy ID Token
-    await signInAndGetToken(email, password)
-    // Bước 2: Lấy profile + roles từ PostgreSQL
+
+    const { data: token } = await apiClient.post<TokenResponse>("/auth/login", {
+      username,
+      password,
+    })
+    setStoredAccessToken(token.access_token, token.expires_in)
+
     const { data } = await apiClient.get<User>("/auth/me")
-    return data
+    return normalizeUser(data)
   },
 
   /**
@@ -45,18 +57,14 @@ export const authApi = {
       return mockMe()
     }
     const { data } = await apiClient.get<User>("/auth/me")
-    return data
+    return normalizeUser(data)
   },
 
   /**
-   * Đăng xuất: clear Firebase session + backend session.
+   * Đăng xuất phía client: backend hiện chưa có /auth/logout.
    */
   logout: async (): Promise<void> => {
-    try {
-      await apiClient.post("/auth/logout")
-    } finally {
-      await firebaseSignOut()
-    }
+    clearStoredAccessToken()
   },
 
   /**
@@ -73,16 +81,14 @@ export const authApi = {
   },
 
   /**
-   * Đăng ký tài khoản mới
+   * Đăng ký tài khoản mới, sau đó login để lấy JWT.
    */
-  register: async (email: string, password: string): Promise<User> => {
+  register: async (username: string, password: string): Promise<User> => {
     if (USE_MOCK) {
-      return mockLogin(email, password) // Dùng lại mock login cho đơn giản
+      return mockLogin(username, password)
     }
-    // Bước 1: Firebase create user → lấy ID Token
-    await signInAndGetToken(email, password)
-    // Bước 2: Tạo profile mới trên PostgreSQL (backend sẽ tự động tạo khi nhận token mới)
-    const { data } = await apiClient.get<User>("/auth/me")
-    return data
+
+    await apiClient.post<User>("/auth/register", { username, password })
+    return authApi.login(username, password)
   },
 }

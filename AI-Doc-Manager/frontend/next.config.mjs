@@ -16,10 +16,19 @@ const nextConfig = {
 
   // Proxy /api/* → FastAPI backend
   async rewrites() {
+    // Use explicit BACKEND_URL when provided. When developing locally
+    // prefer localhost; in containerized deployments the service name
+    // `backend` is resolvable via Docker network.
+    const backendUrl =
+      process.env.BACKEND_URL ||
+      (process.env.NODE_ENV === "development"
+        ? "http://localhost:8000"
+        : "http://backend:8000");
+
     return [
       {
         source: "/api/:path*",
-        destination: `${process.env.BACKEND_URL ?? "http://localhost:8000"}/api/:path*`,
+        destination: `${backendUrl}/api/:path*`,
       },
     ];
   },

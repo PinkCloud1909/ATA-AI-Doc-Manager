@@ -78,3 +78,16 @@ export const chatApi = {
     return data
   },
 }
+
+// ── QA API ───────────────────────────────────────────────────────────────────
+export const qaApi = {
+
+  // ── Chat với AI (non-streaming) ───────────────────────────────────────────
+  chat: async (payload: { message: string; session_id?: string; document_id?: string }): Promise<{
+    response: string;
+    session_id: string;
+  }> => {
+    const { data } = await apiClient.post("/qa/chat", payload)
+    return data
+  },
+}

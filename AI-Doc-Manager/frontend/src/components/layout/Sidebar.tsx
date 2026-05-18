@@ -61,8 +61,11 @@ export default function Sidebar() {
           setIsHovered(false);
           setIsProfileOpen(false);
         }}
-        className={`hidden md:flex flex-col h-full bg-surface-container-low border-r border-transparent py-4 transition-all duration-300 ease-in-out z-40 overflow-visible ${
-          isHovered ? "w-64 px-4" : "w-20 px-2 items-center"
+        // ĐÃ SỬA TẠI ĐÂY: Loại bỏ 'hidden md:flex', thay bằng 'flex' và tối ưu CSS cho màn hình nhỏ
+        className={`flex flex-col h-full bg-surface-container-low border-r border-transparent py-4 transition-all duration-300 ease-in-out z-[70] overflow-visible shrink-0 ${
+          isHovered
+            ? "w-64 px-4 absolute md:relative shadow-[4px_0_24px_rgba(0,0,0,0.15)] md:shadow-none h-full"
+            : "w-16 md:w-20 px-1 md:px-2 items-center relative"
         }`}
       >
         {/* Header: Logo & Title */}

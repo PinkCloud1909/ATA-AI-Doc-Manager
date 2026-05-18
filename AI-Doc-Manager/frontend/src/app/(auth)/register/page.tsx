@@ -9,7 +9,7 @@ export default function RegisterPage() {
   // Nếu chưa có, bạn cần thêm hàm này vào file useAuth.ts nhé
   const { register, isLoading, error } = useAuth();
 
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [localError, setLocalError] = useState("");
@@ -24,7 +24,7 @@ export default function RegisterPage() {
     }
 
     if (register) {
-      await register(email, password);
+      await register(username, password);
     } else {
       setLocalError("Hàm register chưa được cài đặt trong useAuth.");
     }
@@ -67,21 +67,21 @@ export default function RegisterPage() {
           <div className="flex flex-col gap-1.5">
             <label
               className="font-label text-xs uppercase tracking-[0.05em] font-semibold text-on-surface-variant"
-              htmlFor="email"
+              htmlFor="username"
             >
-              Email
+              Tên đăng nhập
             </label>
             <div className="relative">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline-variant text-sm">
-                mail
+                person
               </span>
               <input
-                id="email"
-                type="email"
+                id="username"
+                type="text"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="ten@congty.com"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="ten-dang-nhap"
                 className="w-full bg-surface-container-low border-none rounded pl-10 pr-4 py-3 text-sm font-body text-on-surface placeholder:text-outline-variant focus:ring-0 focus:bg-surface-container-lowest focus:outline focus:outline-1 focus:outline-tertiary/30 transition-all"
               />
             </div>

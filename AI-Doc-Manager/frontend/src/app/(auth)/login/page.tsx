@@ -6,12 +6,12 @@ import { useAuth } from "@/hooks/useAuth";
 
 export default function LoginPage() {
   const { login, isLoading, error } = useAuth();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await login(email, password);
+    await login(username, password);
   };
 
   return (
@@ -51,18 +51,18 @@ export default function LoginPage() {
           <div className="space-y-1.5">
             <label
               className="block text-sm font-medium text-on-surface font-label"
-              htmlFor="email"
+              htmlFor="username"
             >
-              Email
+              Tên đăng nhập
             </label>
             <input
-              id="email"
-              name="email"
-              type="email"
+              id="username"
+              name="username"
+              type="text"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@company.com"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="admin"
               className="w-full bg-surface-container-low text-on-surface font-body text-sm rounded-lg px-4 py-3 border-0 outline-none focus:bg-surface-container-lowest focus:ring-1 focus:ring-outline-variant/30 transition-all placeholder:text-on-surface-variant/50"
             />
           </div>

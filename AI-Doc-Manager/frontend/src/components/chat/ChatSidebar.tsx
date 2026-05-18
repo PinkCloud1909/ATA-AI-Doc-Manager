@@ -44,17 +44,14 @@ const MOCK_HISTORY = [
 ];
 
 export default function ChatSidebar() {
-  // State lưu từ khóa tìm kiếm
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Lọc dữ liệu theo từ khóa (không phân biệt hoa thường)
   const filteredHistory = MOCK_HISTORY.filter(
     (item) =>
       item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.preview.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  // Gom nhóm dữ liệu đã lọc theo trường 'group'
   const groupedHistory = filteredHistory.reduce(
     (acc, item) => {
       if (!acc[item.group]) acc[item.group] = [];
@@ -65,24 +62,18 @@ export default function ChatSidebar() {
   );
 
   return (
-    <aside className="hidden lg:flex flex-col h-full w-72 bg-surface-container-lowest border-r border-outline-variant/20 py-4 shrink-0">
+    <aside className="flex flex-col h-full w-64 lg:w-72 border-r border-outline-variant/20 py-4 shrink-0 absolute lg:relative left-0 top-0 z-30 transition-all duration-300 bg-white/60 lg:bg-surface-container-lowest backdrop-blur-md lg:backdrop-blur-none hover:bg-surface-container-lowest focus-within:bg-surface-container-lowest shadow-[4px_0_24px_rgba(0,0,0,0.05)] lg:shadow-none">
       {/* Các nút tạo mới */}
       <div className="px-4 mb-4">
         <button className="w-full flex items-center justify-center gap-2 bg-tertiary text-on-tertiary px-4 py-2.5 rounded-lg font-medium transition-transform active:scale-95 shadow-sm">
           <span className="material-symbols-outlined text-[20px]">add</span>
           <span>Cuộc hội thoại mới</span>
         </button>
-        <button className="w-full mt-2 flex items-center justify-center gap-2 bg-white border border-tertiary/20 text-tertiary px-4 py-2.5 rounded-lg font-medium transition-transform active:scale-95 hover:bg-surface-container-low">
-          <span className="material-symbols-outlined text-[20px]">
-            note_add
-          </span>
-          <span>Tạo tài liệu mới</span>
-        </button>
       </div>
 
       {/* Thanh tìm kiếm (Real-time) */}
       <div className="px-4 mb-4">
-        <div className="flex items-center gap-1 bg-surface-container-low px-3 py-2 rounded-lg w-full focus-within:ring-2 focus-within:ring-tertiary/20 transition-all">
+        <div className="flex items-center gap-1 bg-surface-container-low px-3 py-2 rounded-lg w-full focus-within:ring-2 focus-within:ring-tertiary/20 transition-all shadow-inner">
           <span className="material-symbols-outlined text-on-surface-variant text-[18px]">
             search
           </span>
@@ -112,7 +103,7 @@ export default function ChatSidebar() {
                 {items.map((item) => (
                   <a
                     key={item.id}
-                    className={`block px-3 py-2 rounded-lg transition-colors ${item.active && !searchQuery ? "bg-surface-container" : "hover:bg-surface-container-low"}`}
+                    className={`block px-3 py-2 rounded-lg transition-colors ${item.active && !searchQuery ? "bg-surface-container/80" : "hover:bg-surface-container-low"}`}
                     href="#"
                   >
                     <p className="text-sm font-medium text-on-surface truncate">

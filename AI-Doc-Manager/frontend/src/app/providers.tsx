@@ -4,36 +4,34 @@ import { useEffect } from "react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { useState } from "react"
 import { Toaster } from "sonner"
-import { onTokenRefresh } from "@/lib/auth/firebase"
 import { authApi } from "@/lib/api/auth"
+import { clearStoredAccessToken, getStoredAccessToken } from "@/lib/api/authToken"
 import { useAuthStore } from "@/stores/authStore"
 
-function FirebaseSessionSync() {
+function BackendSessionSync() {
   const setUser = useAuthStore((s) => s.setUser)
   const logout  = useAuthStore((s) => s.logout)
 
   useEffect(() => {
-    // Lắng nghe Firebase ID Token thay đổi:
-    //  - user = null → đã sign out → clear store
-    //  - user != null → token mới → re-fetch profile (nếu cần)
-    const unsubscribe = onTokenRefresh(async (firebaseUser) => {
-      if (!firebaseUser) {
+    const syncSession = async () => {
+      if (!getStoredAccessToken()) {
         logout()
         return
       }
-      // Nếu store chưa có user (e.g. reload trang), fetch profile
+
       const storeUser = useAuthStore.getState().user
       if (!storeUser) {
         try {
           const me = await authApi.me()
           setUser(me)
         } catch {
+          clearStoredAccessToken()
           logout()
         }
       }
-    })
+    }
 
-    return unsubscribe
+    void syncSession()
   }, [setUser, logout])
 
   return null
@@ -55,7 +53,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <FirebaseSessionSync />
+      <BackendSessionSync />
       {children}
       <Toaster richColors position="top-right" />
     </QueryClientProvider>

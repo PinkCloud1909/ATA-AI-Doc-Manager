@@ -1,23 +1,18 @@
 /**
  * lib/api/client.ts
  *
- * Axios instance với Firebase ID Token authentication.
- *
- * Khác với kiến trúc cũ (MinIO + custom JWT):
- *  - Token là Firebase ID Token (Google-issued, verify phía backend qua IAM)
- *  - Không cần refresh endpoint riêng → Firebase SDK tự rotate token
- *  - Khi token hết hạn, getCurrentIdToken() tự lấy token mới
+ * Axios instance dùng JWT do FastAPI backend cấp qua /api/v1/auth/login.
  */
 
 import axios, {
   AxiosError,
   InternalAxiosRequestConfig,
 } from "axios"
-import { getCurrentIdToken } from "@/lib/auth/firebase"
+import { clearStoredAccessToken, getStoredAccessToken } from "./authToken"
 
-// Mock mode: dùng local Next.js API routes thay vì backend thật
-// Khi cần kết nối backend, set NEXT_PUBLIC_USE_MOCK=false
-const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== "false"
+// Mock mode: dùng local Next.js API routes thay vì backend thật.
+// Mặc định gọi backend; chỉ bật mock khi NEXT_PUBLIC_USE_MOCK=true.
+const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === "true"
 
 const BASE_URL = USE_MOCK
   ? "" // Dùng relative URL → Next.js sẽ proxy đến /api/... local
@@ -29,9 +24,9 @@ export const apiClient = axios.create({
   timeout: 60_000,  // Cloud Run cold start có thể chậm hơn local
 })
 
-// ── Request interceptor: đính Firebase ID Token ───────────────────────────────
+// ── Request interceptor: đính backend JWT ───────────────────────────────────
 apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
-  const token = await getCurrentIdToken()
+  const token = getStoredAccessToken()
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -43,10 +38,10 @@ apiClient.interceptors.response.use(
   (res) => res,
   async (error: AxiosError) => {
     if (error.response?.status === 401) {
-      // Firebase token hết hạn hoặc bị revoke
-      // Redirect về login để user đăng nhập lại
+      clearStoredAccessToken()
       if (typeof window !== "undefined") {
-        window.location.href = "/login"
+        const isAuthPage = ["/login", "/register"].includes(window.location.pathname)
+        if (!isAuthPage) window.location.href = "/login"
       }
     }
     return Promise.reject(error)

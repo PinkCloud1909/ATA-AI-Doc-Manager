@@ -1,24 +1,18 @@
 "use client";
 
 import Link from "next/link";
+/*
+// Giữ nguyên các import của bạn
 import {
   DocumentListItem,
   DocumentStatus,
   DocumentType,
 } from "@/types/document";
 import { StatusBadge } from "./StatusBadge";
-/*
-const TYPE_LABEL: Record<DocumentType, string> = {
-  [DocumentType.TEMPLATE]:          "Template",
-  [DocumentType.CUSTOMER_SPECIFIC]: "Khách hàng",
-  [DocumentType.COMMON_GUIDE]:      "Hướng dẫn chung",
-}
-
-interface Props {
-  items:     DocumentListItem[]
-  isLoading: boolean
-}
 */
+
+// Định nghĩa kiểu dữ liệu cho role người dùng
+export type UserRole = "viewer" | "editor" | "approver";
 
 // Định nghĩa kiểu dữ liệu cho 1 tài liệu
 export interface DocumentItem {
@@ -26,7 +20,8 @@ export interface DocumentItem {
   name: string;
   category: string;
   type: string;
-  status: "Approved" | "Pending" | "Draft";
+  // Bổ sung thêm trạng thái "Expired"
+  status: "Approved" | "Pending" | "Draft" | "Expired";
   version: string;
   score: string;
   updatedAt: string;
@@ -36,11 +31,15 @@ export interface DocumentItem {
   bgColor: string;
 }
 
+interface DocumentTableProps {
+  documents: DocumentItem[];
+  userRole: UserRole; // Thêm prop userRole để nhận quyền từ component cha
+}
+
 export default function DocumentTable({
   documents,
-}: {
-  documents: DocumentItem[];
-}) {
+  userRole,
+}: DocumentTableProps) {
   // Hàm phụ trợ để set màu cho Status Badge
   const getStatusStyle = (status: string) => {
     switch (status) {
@@ -50,15 +49,26 @@ export default function DocumentTable({
         return "bg-amber-50 text-amber-700";
       case "Draft":
         return "bg-neutral-100 text-neutral-600";
+      case "Expired":
+        return "bg-red-50 text-red-700"; // Bổ sung màu cho Expired
       default:
         return "bg-neutral-100 text-neutral-600";
     }
   };
 
+  // LỌC TÀI LIỆU THEO PHÂN QUYỀN
+  const filteredDocuments = documents.filter((doc) => {
+    if (userRole === "viewer") {
+      // Viewer chỉ thấy tài liệu Approved hoặc Expired
+      return doc.status === "Approved" || doc.status === "Expired";
+    }
+    // Editor và Approver thấy toàn bộ
+    return true;
+  });
+
   return (
     <div className="bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm border border-transparent">
       <table className="w-full text-left border-collapse">
-        {/* ... (Giữ nguyên thẻ <thead>) ... */}
         <thead>
           <tr className="bg-surface-container-low/50">
             <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-neutral-400">
@@ -82,17 +92,19 @@ export default function DocumentTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-surface-container-low">
-          {documents.length === 0 ? (
+          {/* Sử dụng filteredDocuments thay vì documents gốc */}
+          {filteredDocuments.length === 0 ? (
             <tr>
               <td
                 colSpan={6}
                 className="px-6 py-10 text-center text-on-surface-variant"
               >
-                Không tìm thấy tài liệu nào phù hợp với bộ lọc.
+                Không tìm thấy tài liệu nào phù hợp với bộ lọc và quyền hạn của
+                bạn.
               </td>
             </tr>
           ) : (
-            documents.map((doc) => (
+            filteredDocuments.map((doc) => (
               <tr
                 key={doc.id}
                 className="hover:bg-surface-container-low/30 transition-colors group"
@@ -118,7 +130,9 @@ export default function DocumentTable({
                 </td>
                 <td className="px-6 py-5">
                   <span
-                    className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full ${getStatusStyle(doc.status)}`}
+                    className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full ${getStatusStyle(
+                      doc.status,
+                    )}`}
                   >
                     {doc.status}
                   </span>
@@ -134,7 +148,13 @@ export default function DocumentTable({
                       {doc.score}
                     </span>
                     <div
-                      className={`w-1.5 h-1.5 rounded-full ${doc.score === "--" ? "bg-neutral-300" : parseFloat(doc.score) >= 8 ? "bg-green-500" : "bg-amber-500"}`}
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        doc.score === "--"
+                          ? "bg-neutral-300"
+                          : parseFloat(doc.score) >= 8
+                            ? "bg-green-500"
+                            : "bg-amber-500"
+                      }`}
                     ></div>
                   </div>
                 </td>
@@ -145,9 +165,7 @@ export default function DocumentTable({
                   </p>
                 </td>
                 <td className="px-6 py-5">
-                  {/* ... (Giữ nguyên các nút Action) ... */}
                   <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {/* ĐÃ CHỈNH SỬA TẠI ĐÂY: Thay <button> bằng <Link> */}
                     <Link
                       href={`/documents/${doc.id}`}
                       className="p-2 hover:bg-surface-container-low rounded-lg text-neutral-500 transition-colors inline-flex items-center justify-center"
@@ -157,30 +175,35 @@ export default function DocumentTable({
                         visibility
                       </span>
                     </Link>
-                    <button
-                      className="p-2 hover:bg-surface-container-low rounded-lg text-neutral-500 transition-colors"
-                      title="So sánh"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">
-                        compare_arrows
-                      </span>
-                    </button>
-                    <button
-                      className="p-2 hover:bg-surface-container-low rounded-lg text-neutral-500 transition-colors"
-                      title="Tạo Runbook"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">
-                        play_circle
-                      </span>
-                    </button>
-                    <button
-                      className="p-2 hover:bg-surface-container-low rounded-lg text-neutral-500 transition-colors"
-                      title="Chấm điểm"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">
-                        grade
-                      </span>
-                    </button>
+                    {/* Bạn có thể ẩn thêm các nút thao tác khác như Chấm điểm, Tạo Runbook nếu role là viewer tại đây */}
+                    {userRole !== "viewer" && (
+                      <>
+                        <button
+                          className="p-2 hover:bg-surface-container-low rounded-lg text-neutral-500 transition-colors"
+                          title="So sánh"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">
+                            compare_arrows
+                          </span>
+                        </button>
+                        <button
+                          className="p-2 hover:bg-surface-container-low rounded-lg text-neutral-500 transition-colors"
+                          title="Tạo Runbook"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">
+                            play_circle
+                          </span>
+                        </button>
+                        <button
+                          className="p-2 hover:bg-surface-container-low rounded-lg text-neutral-500 transition-colors"
+                          title="Chấm điểm"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">
+                            grade
+                          </span>
+                        </button>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -188,10 +211,11 @@ export default function DocumentTable({
           )}
         </tbody>
       </table>
-      {/* ... (Giữ nguyên phần Pagination Area) ... */}
+
+      {/* Cập nhật Pagination hiển thị tổng số dòng đã được lọc */}
       <div className="px-6 py-4 flex items-center justify-between border-t border-surface-container-low bg-white">
         <p className="text-xs text-neutral-500 font-medium">
-          Hiển thị 1-4 trên 24 tài liệu
+          Hiển thị tài liệu (Tổng số: {filteredDocuments.length})
         </p>
         <div className="flex items-center gap-2">
           <button
@@ -204,12 +228,6 @@ export default function DocumentTable({
           </button>
           <button className="w-8 h-8 rounded-lg flex items-center justify-center bg-tertiary text-on-tertiary text-xs font-bold">
             1
-          </button>
-          <button className="w-8 h-8 rounded-lg flex items-center justify-center text-neutral-500 hover:bg-neutral-50 transition-colors text-xs font-bold">
-            2
-          </button>
-          <button className="w-8 h-8 rounded-lg flex items-center justify-center text-neutral-500 hover:bg-neutral-50 transition-colors text-xs font-bold">
-            3
           </button>
           <button className="w-8 h-8 rounded-lg flex items-center justify-center text-neutral-400 hover:bg-neutral-50 transition-colors">
             <span className="material-symbols-outlined text-[18px]">

@@ -7,7 +7,11 @@ import { User } from "@/types/user"
 
 const mockUser: User = {
   id: "1",
+  firebase_uid: "firebase-mock-uid-1",
+  username: "admin",
   email: "admin@company.com",
+  last_password_changed: new Date().toISOString(),
+  roles: [],
   displayName: "Admin User",
   role: "admin",
   permissions: ["read", "write", "delete", "manage_users"],

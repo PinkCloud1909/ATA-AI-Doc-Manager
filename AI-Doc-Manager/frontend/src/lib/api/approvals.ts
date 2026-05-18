@@ -3,10 +3,14 @@ import { DocumentListItem } from "@/types/document"
 
 export const approvalsApi = {
   getPendingQueue: async (): Promise<DocumentListItem[]> => {
-    const { data } = await apiClient.get<{ items: DocumentListItem[] }>("/documents", {
-      params: { status: "PENDING_REVIEW", page_size: 100 },
-    })
-    return data.items ?? data
+    const { data } = await apiClient.get<DocumentListItem[] | { items: DocumentListItem[] }>(
+      "/documents",
+      {
+        params: { status: "PENDING_REVIEW", page_size: 100 },
+      },
+    )
+
+    return Array.isArray(data) ? data : data.items
   },
 
   submit:  async (id: string)              => apiClient.post(`/documents/${id}/submit`),

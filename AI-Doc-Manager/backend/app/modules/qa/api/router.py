@@ -2,11 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException
 import uuid
 
 from app.core.dependencies import get_current_user
+from app.core.exceptions import AppError
 from app.modules.iam.domain.principal import AuthenticatedUser
 from app.modules.qa.api.schemas import ChatRequest, ChatResponse
 from app.modules.qa.application.services import ChatService
 
-router = APIRouter(prefix="/qa", tags=["qa"])
+router = APIRouter(prefix="/api/v1/qa", tags=["qa"])
 
 # Create a singleton for the ChatService
 chat_service = ChatService()
@@ -25,5 +26,7 @@ async def chat(
             message=request.message,
         )
         return ChatResponse(session_id=session_id, response=response_text)
+    except AppError:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

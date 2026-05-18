@@ -9,9 +9,7 @@ export default function AdminRolesPage() {
       </div>
 
       <div className="rounded-lg border p-4">
-        <p className="text-sm text-gray-600">
-          This page is under development.
-        </p>
+        <p className="text-sm text-gray-600">This page is under development.</p>
       </div>
     </main>
   );

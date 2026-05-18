@@ -99,6 +99,9 @@ export default function DocumentsPage() {
   //3. State quản lý việc mở/đóng Modal Upload
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
+  //4. Giả lập quyền người dùng (Thay bằng logic thật khi có API)
+  // const perm = usePermission();
+  const currentUserRole: "viewer" | "editor" | "approver" = "viewer"; // Đổi giá trị này để test UI
   return (
     <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -138,7 +141,7 @@ export default function DocumentsPage() {
         />
 
         {/* Truyền danh sách ĐÃ ĐƯỢC LỌC xuống cho Table */}
-        <DocumentTable documents={filteredDocs} />
+        <DocumentTable documents={filteredDocs} userRole={currentUserRole} />
 
         <DocumentStats />
       </div>
