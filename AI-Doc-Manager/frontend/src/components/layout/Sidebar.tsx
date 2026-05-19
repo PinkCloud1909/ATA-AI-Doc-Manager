@@ -49,6 +49,7 @@ export default function Sidebar() {
       show: perm.canApprove,
     },
     { href: "/chat", label: "AI Chat", icon: "forum" },
+    { href: "/admin/users", label: "User Management", icon: "manage_accounts" },
   ];
 
   const visibleItems = navItems.filter((i) => i.show !== false);
