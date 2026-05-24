@@ -1,79 +1,107 @@
 "use client";
-import { useState } from "react";
-import Link from "next/link";
-import { useDocumentList } from "@/hooks/useDocuments";
-//import { DocumentTable } from "@/components/documents/DocumentTable"
-import { DocumentStatus, DocumentType } from "@/types/document";
+import { useMemo, useState } from "react";
 import { usePermission } from "@/hooks/usePermission";
+import { useDocumentList } from "@/hooks/useDocuments";
 
 import UploadForm from "@/components/documents/UploadForm";
 import DocumentFilters from "@/components/documents/DocumentFilters";
 import DocumentStats from "@/components/documents/DocumentStats";
 
-// Bắt buộc phải có dòng này vì ta dùng useState (Client Component)
 import DocumentTable, {
+  DocumentUserRole,
   DocumentItem,
 } from "@/components/documents/DocumentTable";
+import { DocumentListItem } from "@/types/document";
 
-// Dữ liệu mẫu (Mock Data) giả lập việc gọi API
-const mockData: DocumentItem[] = [
-  {
-    id: "DOC-2024-001",
-    name: "Incident Response Plan v4",
-    category: "Cyber Security",
-    type: "Runbook",
-    status: "Approved",
-    version: "4.2.1",
-    score: "9.5",
-    updatedAt: "Hôm nay, 14:20",
-    author: "Hoàng Nguyễn",
-    icon: "description",
-    bgColor: "bg-red-50",
-    iconColor: "text-red-600",
-  },
-  {
-    id: "DOC-2024-042",
-    name: "Cloud Architecture Guideline",
-    category: "Infrastructure",
-    type: "SOP",
-    status: "Pending",
-    version: "1.0.5",
-    score: "7.2",
-    updatedAt: "Hôm qua, 09:15",
-    author: "Minh Tú",
-    icon: "menu_book",
-    bgColor: "bg-blue-50",
-    iconColor: "text-blue-600",
-  },
-  {
-    id: "DOC-2024-058",
-    name: "Monthly Security Audit Report",
-    category: "Compliance",
-    type: "SOP",
-    status: "Draft",
-    version: "0.9.0",
-    score: "--",
-    updatedAt: "12 Th04, 2024",
-    author: "Alex Trần",
-    icon: "edit_document",
-    bgColor: "bg-neutral-100",
-    iconColor: "text-neutral-600",
-  },
-  {
-    id: "DOC-2024-012",
-    name: "Data Privacy Policy 2024",
-    category: "Legal",
-    type: "Policy",
-    status: "Approved",
-    version: "2.1.0",
-    score: "8.8",
-    updatedAt: "08 Th04, 2024",
-    author: "Minh Tú",
+type RoleOverride = "auto" | DocumentUserRole;
+
+const roleTesterEnabled =
+  process.env.NEXT_PUBLIC_ENABLE_ROLE_TESTER === "true";
+
+const roleOptions: Array<{ value: RoleOverride; label: string }> = [
+  { value: "auto", label: "Auto" },
+  { value: "viewer", label: "Viewer" },
+  { value: "editor", label: "Editor" },
+  { value: "approver", label: "Approver" },
+];
+
+function resolveDocumentUserRole(
+  perm: ReturnType<typeof usePermission>,
+): DocumentUserRole {
+  if (perm.canApprove || perm.canAdmin) return "approver";
+  if (perm.canUpload || perm.canReview) return "editor";
+  return "viewer";
+}
+
+const statusLabels: Record<string, DocumentItem["status"]> = {
+  approved: "Approved",
+  pending_review: "Pending",
+  draft: "Draft",
+  expired: "Expired",
+};
+
+const typeLabels: Record<string, string> = {
+  policy: "Policy",
+  manual: "Manual",
+  report: "Report",
+  other: "Other",
+};
+
+const typeIcons: Record<
+  string,
+  Pick<DocumentItem, "icon" | "bgColor" | "iconColor">
+> = {
+  policy: {
     icon: "policy",
     bgColor: "bg-green-50",
     iconColor: "text-green-600",
   },
-];
+  manual: {
+    icon: "menu_book",
+    bgColor: "bg-blue-50",
+    iconColor: "text-blue-600",
+  },
+  report: {
+    icon: "description",
+    bgColor: "bg-red-50",
+    iconColor: "text-red-600",
+  },
+  other: {
+    icon: "edit_document",
+    bgColor: "bg-neutral-100",
+    iconColor: "text-neutral-600",
+  },
+};
+
+function formatUpdatedAt(value?: string) {
+  if (!value) return "--";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "--";
+
+  return new Intl.DateTimeFormat("vi-VN", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function toDocumentItem(doc: DocumentListItem): DocumentItem {
+  const type = String(doc.document_type ?? "other").toLowerCase();
+  const iconConfig = typeIcons[type] ?? typeIcons.other;
+
+  return {
+    id: doc.document_id ?? doc.id ?? doc.original_filename,
+    name: doc.title ?? doc.original_filename,
+    category: typeLabels[type] ?? type,
+    type: typeLabels[type] ?? type,
+    status: statusLabels[String(doc.status).toLowerCase()] ?? "Draft",
+    version: String(doc.version),
+    score: "--",
+    updatedAt: formatUpdatedAt(doc.created_at),
+    author: doc.created_by_name ?? doc.created_by ?? "Không rõ",
+    ...iconConfig,
+  };
+}
 
 export default function DocumentsPage() {
   // 1. Khai báo State cho các bộ lọc
@@ -81,8 +109,29 @@ export default function DocumentsPage() {
   const [statusFilter, setStatusFilter] = useState("Tất cả");
   const [typeFilter, setTypeFilter] = useState("Tất cả");
 
+  //3. State quản lý việc mở/đóng Modal Upload
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+
+  const {
+    data: documentList,
+    isLoading: isLoadingDocuments,
+    isError: isDocumentListError,
+  } = useDocumentList({ page: 1, page_size: 100 });
+  const documents = useMemo(
+    () => (documentList?.items ?? []).map(toDocumentItem),
+    [documentList],
+  );
+
+  const perm = usePermission();
+  const inferredUserRole = resolveDocumentUserRole(perm);
+  const [roleOverride, setRoleOverride] = useState<RoleOverride>("auto");
+  const currentUserRole =
+    roleTesterEnabled && roleOverride !== "auto"
+      ? roleOverride
+      : inferredUserRole;
+
   // 2. Logic Lọc dữ liệu (Real-time)
-  const filteredDocs = mockData.filter((doc) => {
+  const filteredDocs = documents.filter((doc) => {
     // Ép về chữ thường để tìm kiếm không phân biệt hoa thường
     const matchesSearch =
       doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -96,18 +145,11 @@ export default function DocumentsPage() {
     return matchesSearch && matchesStatus && matchesType;
   });
 
-  //3. State quản lý việc mở/đóng Modal Upload
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-
-  //4. Giả lập quyền người dùng (Thay bằng logic thật khi có API)
-  // const perm = usePermission();
-  const currentUserRole: "viewer" | "editor" | "approver" = "viewer"; // Đổi giá trị này để test UI
   return (
     <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
       <div className="max-w-7xl mx-auto space-y-8">
-        {/* ... (Giữ nguyên phần Page Header có nút Tải lên) ... */}
         {/* Page Header */}
-        <div className="flex justify-between items-end">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-1">
             <h2 className="text-3xl font-extrabold tracking-tight text-on-surface">
               Quản lý tài liệu
@@ -116,17 +158,45 @@ export default function DocumentsPage() {
               Trung tâm lưu trữ và kiểm duyệt tri thức hệ thống Architect SOC.
             </p>
           </div>
-          <div className="flex justify-between items-end">
-            {/* ... */}
-            <button
-              onClick={() => setIsUploadModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 transition-colors rounded-lg text-sm font-medium text-white"
-            >
-              <span className="material-symbols-outlined text-sm">
-                upload_file
-              </span>
-              Tải lên
-            </button>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+            {roleTesterEnabled && (
+              <div
+                className="inline-flex w-full rounded-lg bg-surface-container-low p-1 sm:w-auto"
+                role="group"
+                aria-label="Role kiểm thử"
+                data-testid="documents-role-tester"
+              >
+                {roleOptions.map((option) => {
+                  const isSelected = roleOverride === option.value;
+
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setRoleOverride(option.value)}
+                      className={`min-h-9 flex-1 rounded-lg px-3 text-xs font-bold uppercase tracking-wide transition-colors sm:flex-none ${
+                        isSelected
+                          ? "bg-white text-tertiary shadow-sm"
+                          : "text-on-surface-variant hover:bg-white/60"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {currentUserRole !== "viewer" && (
+              <button
+                onClick={() => setIsUploadModalOpen(true)}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 transition-colors rounded-lg text-sm font-medium text-white"
+              >
+                <span className="material-symbols-outlined text-sm">
+                  upload_file
+                </span>
+                Tải lên
+              </button>
+            )}
           </div>
         </div>
 
@@ -140,8 +210,20 @@ export default function DocumentsPage() {
           setTypeFilter={setTypeFilter}
         />
 
-        {/* Truyền danh sách ĐÃ ĐƯỢC LỌC xuống cho Table */}
-        <DocumentTable documents={filteredDocs} userRole={currentUserRole} />
+        {isDocumentListError && (
+          <div className="rounded-lg bg-error-container/20 px-4 py-3 text-sm font-medium text-error">
+            Không thể tải danh sách tài liệu từ backend. Vui lòng kiểm tra đăng
+            nhập và quyền truy cập API.
+          </div>
+        )}
+
+        {isLoadingDocuments ? (
+          <div className="rounded-lg bg-surface-container-lowest px-6 py-10 text-center text-sm text-on-surface-variant">
+            Đang tải danh sách tài liệu từ backend...
+          </div>
+        ) : (
+          <DocumentTable documents={filteredDocs} userRole={currentUserRole} />
+        )}
 
         <DocumentStats />
       </div>

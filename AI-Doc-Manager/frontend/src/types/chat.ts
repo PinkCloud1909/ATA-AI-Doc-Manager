@@ -26,6 +26,14 @@ export interface ChatMessage {
   is_streaming?: boolean
 }
 
+export interface ChatSession {
+  id:        string
+  title:     string
+  preview:   string
+  updatedAt: string
+  messages:  ChatMessage[]
+}
+
 export interface ChatRequest {
   message:    string
   session_id: string

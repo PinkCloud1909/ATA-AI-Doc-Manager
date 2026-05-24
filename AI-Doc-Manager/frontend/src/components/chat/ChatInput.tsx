@@ -1,23 +1,24 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { useChat } from "@/hooks/useChat";
-import MessageBubble from "./MessageBubble";
-import { VoiceInput } from "./VoiceInput";
 import { useState, KeyboardEvent } from "react";
 
 interface ChatInputProps {
   onSendMessage: (text: string) => void;
+  disabled?: boolean;
 }
 
-export default function ChatInput({ onSendMessage }: ChatInputProps) {
+export default function ChatInput({
+  onSendMessage,
+  disabled = false,
+}: ChatInputProps) {
   const [text, setText] = useState("");
   const [isRecording, setIsRecording] = useState(false);
 
   // Hàm xử lý khi bấm gửi
   const handleSend = () => {
     if (text.trim() === "") return;
-    onSendMessage(text);
+    if (disabled) return;
+    onSendMessage(text.trim());
     setText(""); // Xóa trắng ô nhập liệu sau khi gửi
   };
 
@@ -31,6 +32,7 @@ export default function ChatInput({ onSendMessage }: ChatInputProps) {
 
   // Giả lập tính năng Voice (Web Speech API thực tế sẽ cần nhiều code hơn)
   const handleVoiceInput = () => {
+    if (disabled) return;
     setIsRecording(!isRecording);
     if (!isRecording) {
       // Giả lập việc nhận diện giọng nói sau 2 giây
@@ -51,11 +53,14 @@ export default function ChatInput({ onSendMessage }: ChatInputProps) {
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
+            disabled={disabled}
             className="w-full bg-transparent border-none focus:ring-0 text-on-surface placeholder:text-on-surface-variant/50 px-4 py-3 pr-24 resize-none min-h-[56px] custom-scrollbar"
             placeholder={
-              isRecording
-                ? "Đang nghe..."
-                : "Hỏi AI về tài liệu hoặc yêu cầu chấm điểm (Nhấn Enter để gửi)..."
+              disabled
+                ? "AI đang trả lời..."
+                : isRecording
+                  ? "Đang nghe..."
+                  : "Hỏi AI về tài liệu hoặc yêu cầu chấm điểm (Nhấn Enter để gửi)..."
             }
             rows={1}
           />
@@ -63,6 +68,7 @@ export default function ChatInput({ onSendMessage }: ChatInputProps) {
             {/* Nút Micro */}
             <button
               onClick={handleVoiceInput}
+              disabled={disabled}
               className={`w-10 h-10 flex items-center justify-center rounded-full transition-all ${isRecording ? "bg-error/10 text-error animate-pulse" : "text-on-surface-variant hover:text-tertiary hover:bg-tertiary/10"}`}
             >
               <span className="material-symbols-outlined">mic</span>
@@ -70,7 +76,7 @@ export default function ChatInput({ onSendMessage }: ChatInputProps) {
             {/* Nút Gửi */}
             <button
               onClick={handleSend}
-              disabled={text.trim() === ""}
+              disabled={disabled || text.trim() === ""}
               className="w-10 h-10 flex items-center justify-center bg-tertiary text-on-tertiary rounded-xl shadow-lg shadow-tertiary/20 hover:bg-tertiary-dim transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span

@@ -50,6 +50,7 @@ export default function DocumentFilters({
           <option value="Draft">Draft</option>
           <option value="Pending">Pending</option>
           <option value="Approved">Approved</option>
+          <option value="Expired">Expired</option>
         </select>
       </div>
 
@@ -64,9 +65,10 @@ export default function DocumentFilters({
           className="w-full bg-surface-container-low border-none rounded-lg py-2 text-sm focus:ring-0"
         >
           <option value="Tất cả">Tất cả</option>
-          <option value="Runbook">Runbook</option>
-          <option value="SOP">SOP</option>
           <option value="Policy">Policy</option>
+          <option value="Manual">Manual</option>
+          <option value="Report">Report</option>
+          <option value="Other">Other</option>
         </select>
       </div>
 

@@ -5,8 +5,6 @@ import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function RegisterPage() {
-  // Giả định bạn có hàm register trong useAuth
-  // Nếu chưa có, bạn cần thêm hàm này vào file useAuth.ts nhé
   const { register, isLoading, error } = useAuth();
 
   const [username, setUsername] = useState("");
@@ -17,17 +15,24 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError("");
+    const normalizedUsername = username.trim();
+
+    if (normalizedUsername.length < 3) {
+      setLocalError("Tên đăng nhập phải có ít nhất 3 ký tự.");
+      return;
+    }
+
+    if (password.length < 8) {
+      setLocalError("Mật khẩu phải có ít nhất 8 ký tự.");
+      return;
+    }
 
     if (password !== confirmPassword) {
       setLocalError("Mật khẩu xác nhận không khớp.");
       return;
     }
 
-    if (register) {
-      await register(username, password);
-    } else {
-      setLocalError("Hàm register chưa được cài đặt trong useAuth.");
-    }
+    await register(normalizedUsername, password);
   };
 
   const displayError = localError || error;
@@ -79,6 +84,9 @@ export default function RegisterPage() {
                 id="username"
                 type="text"
                 required
+                minLength={3}
+                maxLength={100}
+                autoComplete="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="ten-dang-nhap"
@@ -102,6 +110,9 @@ export default function RegisterPage() {
                 id="password"
                 type="password"
                 required
+                minLength={8}
+                maxLength={255}
+                autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
@@ -125,6 +136,9 @@ export default function RegisterPage() {
                 id="confirm-password"
                 type="password"
                 required
+                minLength={8}
+                maxLength={255}
+                autoComplete="new-password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="••••••••"

@@ -11,8 +11,9 @@ import {
 import { StatusBadge } from "./StatusBadge";
 */
 
-// Định nghĩa kiểu dữ liệu cho role người dùng
-export type UserRole = "viewer" | "editor" | "approver";
+// Định nghĩa kiểu dữ liệu cho role người dùng trong màn Documents
+export type DocumentUserRole = "viewer" | "editor" | "approver";
+export type UserRole = DocumentUserRole;
 
 // Định nghĩa kiểu dữ liệu cho 1 tài liệu
 export interface DocumentItem {
@@ -33,7 +34,21 @@ export interface DocumentItem {
 
 interface DocumentTableProps {
   documents: DocumentItem[];
-  userRole: UserRole; // Thêm prop userRole để nhận quyền từ component cha
+  userRole: DocumentUserRole; // Thêm prop userRole để nhận quyền từ component cha
+}
+
+export function filterDocumentsByRole(
+  documents: DocumentItem[],
+  userRole: DocumentUserRole,
+) {
+  return documents.filter((doc) => {
+    if (userRole === "viewer") {
+      // Viewer chỉ thấy tài liệu đã công bố hoặc đã hết hạn
+      return doc.status === "Approved" || doc.status === "Expired";
+    }
+    // Editor và Approver thấy toàn bộ
+    return true;
+  });
 }
 
 export default function DocumentTable({
@@ -56,15 +71,7 @@ export default function DocumentTable({
     }
   };
 
-  // LỌC TÀI LIỆU THEO PHÂN QUYỀN
-  const filteredDocuments = documents.filter((doc) => {
-    if (userRole === "viewer") {
-      // Viewer chỉ thấy tài liệu Approved hoặc Expired
-      return doc.status === "Approved" || doc.status === "Expired";
-    }
-    // Editor và Approver thấy toàn bộ
-    return true;
-  });
+  const filteredDocuments = filterDocumentsByRole(documents, userRole);
 
   return (
     <div className="bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm border border-transparent">

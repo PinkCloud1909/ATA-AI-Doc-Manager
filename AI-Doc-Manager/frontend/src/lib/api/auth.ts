@@ -9,11 +9,7 @@
 
 import apiClient from "./client"
 import { User } from "@/types/user"
-import { mockLogin, mockMe } from "./auth.mock"
 import { clearStoredAccessToken, setStoredAccessToken } from "./authToken"
-
-// Mock mode: không cần Firebase hay backend
-const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === "true"
 
 interface TokenResponse {
   access_token: string
@@ -26,21 +22,20 @@ function normalizeUser(user: User): User {
     ...user,
     displayName: user.displayName ?? user.username,
     email: user.email ?? user.username,
-    role: user.role ?? (typeof user.roles?.[0] === "string" ? user.roles[0] : undefined),
+    role:
+      user.role ??
+      (typeof user.roles?.[0] === "string" ? user.roles[0] : undefined),
   }
 }
 
 export const authApi = {
   /**
-   * Đăng nhập - tự động dùng mock nếu NEXT_PUBLIC_USE_MOCK=true.
+   * Đăng nhập qua backend FastAPI để lấy JWT.
    */
   login: async (username: string, password: string): Promise<User> => {
-    if (USE_MOCK) {
-      return mockLogin(username, password)
-    }
-
+    const normalizedUsername = username.trim()
     const { data: token } = await apiClient.post<TokenResponse>("/auth/login", {
-      username,
+      username: normalizedUsername,
       password,
     })
     setStoredAccessToken(token.access_token, token.expires_in)
@@ -53,9 +48,6 @@ export const authApi = {
    * Lấy profile hiện tại
    */
   me: async (): Promise<User> => {
-    if (USE_MOCK) {
-      return mockMe()
-    }
     const { data } = await apiClient.get<User>("/auth/me")
     return normalizeUser(data)
   },
@@ -84,11 +76,11 @@ export const authApi = {
    * Đăng ký tài khoản mới, sau đó login để lấy JWT.
    */
   register: async (username: string, password: string): Promise<User> => {
-    if (USE_MOCK) {
-      return mockLogin(username, password)
-    }
-
-    await apiClient.post<User>("/auth/register", { username, password })
-    return authApi.login(username, password)
+    const normalizedUsername = username.trim()
+    await apiClient.post<User>("/auth/register", {
+      username: normalizedUsername,
+      password,
+    })
+    return authApi.login(normalizedUsername, password)
   },
 }

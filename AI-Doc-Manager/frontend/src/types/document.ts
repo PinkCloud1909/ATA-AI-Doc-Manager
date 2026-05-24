@@ -51,15 +51,19 @@ export interface Document {
 }
 
 export interface DocumentListItem {
-  id:                string
+  id?:               string
+  document_id?:      string
   document_group_id: string
   version:           number
-  document_type:     DocumentType
-  status:            DocumentStatus
-  file_link:         string
+  title?:            string
+  document_type:     DocumentType | string
+  status:            DocumentStatus | string
+  file_link?:        string
   original_filename: string
   size_bytes?:       number
-  created_by_name:   string
+  file_size?:        number
+  created_by?:       string
+  created_by_name?:  string
   created_at:        string
   avg_grade?:        number
 }

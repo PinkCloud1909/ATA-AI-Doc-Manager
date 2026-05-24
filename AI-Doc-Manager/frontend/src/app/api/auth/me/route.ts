@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server"
 
-// Mock user data
-const mockUser = {
-  id: "1",
-  email: "admin@company.com",
-  displayName: "Admin User",
-  role: "admin",
-  permissions: ["read", "write", "delete", "manage_users"],
-}
+export async function GET(request: Request) {
+  const backendUrl = process.env.BACKEND_URL || "http://localhost:8000"
+  const authorization = request.headers.get("authorization")
 
-export async function GET() {
-  return NextResponse.json(mockUser)
+  const response = await fetch(`${backendUrl}/api/v1/auth/me`, {
+    headers: authorization ? { Authorization: authorization } : undefined,
+    cache: "no-store",
+  })
+
+  const data = await response.json().catch(() => null)
+  return NextResponse.json(data, { status: response.status })
 }

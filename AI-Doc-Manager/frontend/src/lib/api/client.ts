@@ -10,13 +10,7 @@ import axios, {
 } from "axios"
 import { clearStoredAccessToken, getStoredAccessToken } from "./authToken"
 
-// Mock mode: dùng local Next.js API routes thay vì backend thật.
-// Mặc định gọi backend; chỉ bật mock khi NEXT_PUBLIC_USE_MOCK=true.
-const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === "true"
-
-const BASE_URL = USE_MOCK
-  ? "" // Dùng relative URL → Next.js sẽ proxy đến /api/... local
-  : process.env.NEXT_PUBLIC_API_URL ?? "/api/v1"
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api/v1"
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,

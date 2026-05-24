@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useRef, useEffect } from "react";
 import MessageBubble from "@/components/chat/MessageBubble";
 import ChatInput from "@/components/chat/ChatInput";
 import ChatSidebar from "@/components/chat/ChatSidebar";
@@ -230,7 +230,7 @@ const MOCK_CHAT_HISTORY: ChatMessage[] = [
 
 export default function ChatPage() {
   const { messages, isStreaming } = useChatStore();
-  const { sendMessage, stopStreaming } = useChat();
+  const { sendMessage } = useChat();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -254,36 +254,54 @@ export default function ChatPage() {
       <main className="flex-1 flex flex-col h-full relative overflow-hidden">
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto px-6 py-8 space-y-10 custom-scrollbar">
-          {messages.map((msg) => (
-            <MessageBubble
-              key={msg.id}
-              role={msg.role === "user" ? "user" : "ai"}
-              timestamp={new Date(msg.timestamp).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-              badgeType={msg.is_from_kb ? "trusted" : "generated"}
-            >
-              <p className="text-[15px] leading-relaxed text-on-surface whitespace-pre-wrap">
-                {msg.content}
-              </p>
-              {msg.sources && msg.sources.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  <p className="text-sm font-semibold text-on-surface-variant">
-                    Nguồn tham khảo:
-                  </p>
-                  {msg.sources.map((source, idx) => (
-                    <div key={idx} className="text-xs text-on-surface-variant">
-                      {source.original_filename}
-                    </div>
-                  ))}
+          {messages.length === 0 ? (
+            <div className="flex h-full items-center justify-center">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-surface-container-low text-tertiary">
+                  <span className="material-symbols-outlined text-[30px]">
+                    auto_awesome
+                  </span>
                 </div>
-              )}
-            </MessageBubble>
-          ))}
+                <h2 className="text-xl font-bold text-on-surface">
+                  Architect AI
+                </h2>
+              </div>
+            </div>
+          ) : (
+            messages.map((msg) => (
+              <MessageBubble
+                key={msg.id}
+                role={msg.role === "user" ? "user" : "ai"}
+                timestamp={new Date(msg.timestamp).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+                badgeType={msg.is_from_kb ? "trusted" : "generated"}
+              >
+                <p className="text-[15px] leading-relaxed text-on-surface whitespace-pre-wrap">
+                  {msg.content}
+                </p>
+                {msg.sources && msg.sources.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    <p className="text-sm font-semibold text-on-surface-variant">
+                      Nguồn tham khảo:
+                    </p>
+                    {msg.sources.map((source, idx) => (
+                      <div
+                        key={idx}
+                        className="text-xs text-on-surface-variant"
+                      >
+                        {source.original_filename}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </MessageBubble>
+            ))
+          )}
           <div ref={messagesEndRef} />
         </div>
-        <ChatInput onSendMessage={handleSendMessage} />
+        <ChatInput onSendMessage={handleSendMessage} disabled={isStreaming} />
       </main>
     </div>
   );
