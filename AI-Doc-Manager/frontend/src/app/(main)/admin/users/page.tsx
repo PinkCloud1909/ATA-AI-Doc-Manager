@@ -94,6 +94,24 @@ const roleDots: Record<UserRole, string> = {
   Approver: "bg-tertiary",
 };
 
+const rolePermissions: Array<{
+  role: UserRole;
+  permissions: string;
+}> = [
+  {
+    role: "Viewer",
+    permissions: "Xem tài liệu, Chấm điểm, Nhận xét",
+  },
+  {
+    role: "Editor",
+    permissions: "Toàn quyền Viewer, Upload tài liệu",
+  },
+  {
+    role: "Approver",
+    permissions: "Toàn quyền Editor, Duyệt tài liệu",
+  },
+];
+
 function StatCard({
   label,
   value,
@@ -125,6 +143,7 @@ export default function UsersPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkRole, setBulkRole] = useState<UserRole>("Viewer");
   const [isBulkOpen, setIsBulkOpen] = useState(false);
+  const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
 
   const displayedUsers = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -247,6 +266,16 @@ export default function UsersPage() {
           </label>
         </div>
 
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <button
+            type="button"
+            onClick={() => setIsPermissionsOpen(true)}
+            className="inline-flex h-12 items-center justify-center gap-3 bg-surface-container px-6 text-sm font-bold text-on-surface shadow-sm transition-colors hover:bg-surface-container-high"
+          >
+            <span className="material-symbols-outlined text-[21px]">policy</span>
+            Xem quyền của vai trò
+          </button>
+
         <button
           type="button"
           onClick={() => setIsBulkOpen(true)}
@@ -261,6 +290,7 @@ export default function UsersPage() {
             </span>
           )}
         </button>
+        </div>
       </div>
 
       <section className="overflow-hidden border border-outline-variant/10 bg-white shadow-sm">
@@ -439,6 +469,64 @@ export default function UsersPage() {
                 className="bg-tertiary px-4 py-2 text-sm font-bold text-on-tertiary hover:bg-tertiary-dim"
               >
                 Áp dụng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isPermissionsOpen && (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="role-permissions-title"
+        >
+          <div className="w-full max-w-xl overflow-hidden bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-outline-variant/10 px-8 py-6">
+              <h2
+                id="role-permissions-title"
+                className="text-2xl font-black tracking-tight text-on-surface"
+              >
+                Quyền của từng vai trò
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsPermissionsOpen(false)}
+                className="material-symbols-outlined p-1 text-[28px] text-on-surface-variant transition-colors hover:text-on-surface"
+                aria-label="Đóng"
+              >
+                close
+              </button>
+            </div>
+
+            <div className="px-8 py-7">
+              <div className="space-y-7">
+                {rolePermissions.map((item) => (
+                  <div key={item.role} className="flex gap-5">
+                    <span
+                      className={`mt-2 h-2.5 w-2.5 shrink-0 rounded-full ${roleDots[item.role]}`}
+                    />
+                    <div>
+                      <p className="text-base font-black uppercase tracking-wide text-on-surface">
+                        {item.role}
+                      </p>
+                      <p className="mt-2 text-base leading-6 text-on-surface-variant">
+                        {item.permissions}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end bg-surface-container-low px-8 py-5">
+              <button
+                type="button"
+                onClick={() => setIsPermissionsOpen(false)}
+                className="bg-surface-container px-6 py-3 text-sm font-bold text-on-surface transition-colors hover:bg-surface-container-high"
+              >
+                Đóng
               </button>
             </div>
           </div>

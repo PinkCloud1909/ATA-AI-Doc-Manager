@@ -15,6 +15,7 @@ pnpm-debug.log
 out/
 build/
 dist/
+*.tsbuildinfo
 
 # ========================
 # 3. Biến môi trường (MẬT KHẨU/API KEYS)
