@@ -1,10 +1,8 @@
 "use client";
 
-import React, { useState, ChangeEvent, FormEvent, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { useUploadDocument } from "@/hooks/useDocuments";
-import { DocumentType } from "@/types/document";
-import { formatFileSize, isPdf, isDocx } from "@/lib/gcs";
+import { useState, type ChangeEvent, type FormEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import apiClient from "@/lib/api/client";
 import { toast } from "sonner";
 
 /*
@@ -186,9 +184,43 @@ interface UploadFormProps {
   onClose: () => void;
 }
 
+const MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024;
+
+const isAcceptedDocumentFile = (file: File) =>
+  /\.(pdf|doc|docx)$/i.test(file.name);
+
+const getUploadErrorMessage = (error: unknown) => {
+  const fallback = "Tải tài liệu thất bại. Vui lòng thử lại.";
+
+  if (typeof error === "object" && error !== null && "response" in error) {
+    const response = (
+      error as { response?: { data?: { detail?: unknown } } }
+    ).response;
+    const detail = response?.data?.detail;
+
+    if (typeof detail === "string") return detail;
+    if (Array.isArray(detail)) {
+      const message = detail
+        .map((item) =>
+          typeof item === "object" && item !== null && "msg" in item
+            ? String((item as { msg: unknown }).msg)
+            : "",
+        )
+        .filter(Boolean)
+        .join(", ");
+
+      if (message) return message;
+    }
+  }
+
+  return error instanceof Error ? error.message : fallback;
+};
+
 export default function UploadForm({ onClose }: UploadFormProps) {
+  const queryClient = useQueryClient();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
 
   // State cho Metadata
   const [docName, setDocName] = useState("");
@@ -199,64 +231,98 @@ export default function UploadForm({ onClose }: UploadFormProps) {
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
+
+      if (!isAcceptedDocumentFile(file)) {
+        toast.error("Chỉ hỗ trợ file .pdf, .doc hoặc .docx");
+        e.target.value = "";
+        return;
+      }
+
+      if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+        toast.error("File vượt quá giới hạn 50MB");
+        e.target.value = "";
+        return;
+      }
+
       setSelectedFile(file);
       setDocName(file.name.replace(/\.[^/.]+$/, "")); // Tự động lấy tên file làm tên tài liệu
-
-      // Giả lập tiến trình tải lên từ Frontend (UI)
       setUploadProgress(0);
-      const interval = setInterval(() => {
-        setUploadProgress((prev) => {
-          if (prev >= 100) {
-            clearInterval(interval);
-            return 100;
-          }
-          return prev + 10;
-        });
-      }, 200);
     }
   };
 
   const handleRemoveFile = () => {
+    if (isUploading) return;
+
     setSelectedFile(null);
     setUploadProgress(0);
   };
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!selectedFile) return;
 
-    // TODO: Tích hợp gọi Backend API tại đây
-    // 1. Tạo FormData chứa file và metadata
-    // const formData = new FormData();
-    // formData.append('file', selectedFile);
-    // formData.append('name', docName);
-    // formData.append('type', docType);
-    // formData.append('description', description);
+    if (!selectedFile) {
+      toast.error("Vui lòng chọn file cần tải lên");
+      return;
+    }
 
-    // 2. Dùng axios POST lên backend: axios.post('/api/documents/upload', formData)
-    // 3. Backend nhận file stream và bắn thẳng lên Google Cloud Storage (GCS).
+    const title = docName.trim();
+    if (!title) {
+      toast.error("Vui lòng nhập tên tài liệu");
+      return;
+    }
 
-    console.log("Đang upload...", {
-      file: selectedFile.name,
-      docName,
-      docType,
-    });
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+    formData.append("document_type", docType);
+    formData.append("title", title);
 
-    // Đóng form sau khi thành công
-    // onClose();
+    const trimmedDescription = description.trim();
+    if (trimmedDescription) {
+      formData.append("description", trimmedDescription);
+    }
+
+    try {
+      setIsUploading(true);
+      setUploadProgress(0);
+
+      await apiClient.post("/documents/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (progressEvent) => {
+          if (!progressEvent.total) return;
+
+          setUploadProgress(
+            Math.round((progressEvent.loaded * 100) / progressEvent.total),
+          );
+        },
+      });
+
+      setUploadProgress(100);
+      await queryClient.invalidateQueries({ queryKey: ["documents"] });
+      toast.success("Tải tài liệu lên storage thành công");
+      onClose();
+    } catch (error) {
+      toast.error(getUploadErrorMessage(error));
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-on-background/20 backdrop-blur-sm transition-opacity duration-300">
-      <div className="bg-surface-container-lowest w-full max-w-lg rounded-[1rem] shadow-[0_10px_40px_-10px_rgba(43,52,55,0.15)] flex flex-col overflow-hidden max-h-[600px]">
+      <form
+        onSubmit={handleSubmit}
+        className="bg-surface-container-lowest w-full max-w-lg rounded-[1rem] shadow-[0_10px_40px_-10px_rgba(43,52,55,0.15)] flex flex-col overflow-hidden max-h-[600px]"
+      >
         {/* Header */}
         <div className="px-6 py-4 border-b border-surface-variant/40 flex justify-between items-center bg-surface-container-lowest shrink-0">
           <h2 className="font-headline text-xl font-bold tracking-tight text-on-background">
             Tải lên tài liệu
           </h2>
           <button
+            type="button"
             onClick={onClose}
-            className="text-on-surface-variant hover:text-on-background hover:bg-surface-container p-1.5 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-tertiary/30"
+            disabled={isUploading}
+            className="text-on-surface-variant hover:text-on-background hover:bg-surface-container p-1.5 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-tertiary/30 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <span
               className="material-symbols-outlined"
@@ -286,7 +352,10 @@ export default function UploadForm({ onClose }: UploadFormProps) {
               <p className="font-body text-sm text-on-surface-variant mb-4">
                 Hỗ trợ các định dạng .pdf, .doc, .docx lên đến 50MB
               </p>
-              <button className="bg-surface-container-lowest border border-outline-variant/50 text-on-background px-4 py-2 rounded-lg font-medium text-sm hover:bg-surface transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-tertiary/30">
+              <button
+                type="button"
+                className="bg-surface-container-lowest border border-outline-variant/50 text-on-background px-4 py-2 rounded-lg font-medium text-sm hover:bg-surface transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-tertiary/30"
+              >
                 Chọn file từ máy tính
               </button>
               <input
@@ -302,7 +371,7 @@ export default function UploadForm({ onClose }: UploadFormProps) {
           {selectedFile && (
             <div className="space-y-3">
               <h4 className="font-body text-sm font-semibold tracking-wide text-on-background uppercase letter-spacing-[0.05em] mb-2 flex items-center gap-2">
-                Đang tải lên{" "}
+                {isUploading ? "Đang tải lên" : "Tệp đã chọn"}{" "}
                 <span className="bg-surface-container px-2 py-0.5 rounded-full text-xs font-medium text-on-surface-variant">
                   1
                 </span>
@@ -337,8 +406,10 @@ export default function UploadForm({ onClose }: UploadFormProps) {
                       {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
                     </p>
                     <button
+                      type="button"
                       onClick={handleRemoveFile}
-                      className="text-on-surface-variant hover:text-error opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-error-container/20"
+                      disabled={isUploading}
+                      className="text-on-surface-variant hover:text-error opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-error-container/20 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <span
                         className="material-symbols-outlined"
@@ -392,9 +463,9 @@ export default function UploadForm({ onClose }: UploadFormProps) {
                     <option disabled value="">
                       Chọn phân loại
                     </option>
+                    <option value="policy">Chính sách (Policy)</option>
+                    <option value="manual">Hướng dẫn (Manual)</option>
                     <option value="report">Báo cáo (Report)</option>
-                    <option value="blueprint">Bản vẽ (Blueprint)</option>
-                    <option value="contract">Hợp đồng (Contract)</option>
                     <option value="other">Khác</option>
                   </select>
                   <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-on-surface-variant">
@@ -429,14 +500,16 @@ export default function UploadForm({ onClose }: UploadFormProps) {
         {/* Footer Actions */}
         <div className="px-6 py-4 bg-surface-container-low/30 border-t border-surface-variant/40 flex justify-end gap-3 shrink-0">
           <button
+            type="button"
             onClick={onClose}
-            className="px-5 py-2.5 rounded-lg font-label font-medium text-sm text-on-surface hover:bg-surface-container transition-colors focus:outline-none focus:ring-2 focus:ring-outline-variant"
+            disabled={isUploading}
+            className="px-5 py-2.5 rounded-lg font-label font-medium text-sm text-on-surface hover:bg-surface-container transition-colors focus:outline-none focus:ring-2 focus:ring-outline-variant disabled:cursor-not-allowed disabled:opacity-50"
           >
             Hủy
           </button>
           <button
-            onClick={handleSubmit}
-            disabled={!selectedFile || uploadProgress < 100}
+            type="submit"
+            disabled={!selectedFile || isUploading}
             className="px-5 py-2.5 rounded-lg font-label font-medium text-sm text-on-primary shadow-sm flex items-center gap-2 transition-all focus:outline-none focus:ring-2 focus:ring-tertiary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               background: "linear-gradient(180deg, #0053dc 0%, #0049c2 100%)",
@@ -448,10 +521,10 @@ export default function UploadForm({ onClose }: UploadFormProps) {
             >
               cloud_upload
             </span>
-            Tải lên
+            {isUploading ? "Đang tải lên..." : "Tải lên"}
           </button>
         </div>
-      </div>
+      </form>
     </div>
   );
 }
