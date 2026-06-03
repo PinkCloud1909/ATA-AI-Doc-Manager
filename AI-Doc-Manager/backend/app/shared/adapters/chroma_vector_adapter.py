@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import chromadb
 
@@ -20,7 +20,7 @@ class ChromaVectorAdapter(IVectorStore):
         text-embedding-004 model and gives more intuitive similarity scores.
     """
 
-    def __init__(self, settings: Optional[Settings] = None) -> None:
+    def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
 
         if self.settings.chroma_host:
@@ -51,9 +51,9 @@ class ChromaVectorAdapter(IVectorStore):
     def upsert_document(
         self,
         document_id: str,
-        text_chunks: List[str],
-        embeddings: List[List[float]],
-        metadata: Optional[Dict] = None,
+        text_chunks: list[str],
+        embeddings: list[list[float]],
+        metadata: dict | None = None,
     ) -> None:
         if not text_chunks:
             return
@@ -72,15 +72,15 @@ class ChromaVectorAdapter(IVectorStore):
         )
 
     def semantic_search(
-        self, query_embedding: List[float], top_k: int = 5
-    ) -> List[Dict[str, Any]]:
+        self, query_embedding: list[float], top_k: int = 5
+    ) -> list[dict[str, Any]]:
         results = self.collection.query(
             query_embeddings=[query_embedding],
             n_results=top_k,
             include=["documents", "metadatas", "distances"],
         )
 
-        matches: List[Dict[str, Any]] = []
+        matches: list[dict[str, Any]] = []
         if not results["documents"] or not results["documents"][0]:
             return matches
 

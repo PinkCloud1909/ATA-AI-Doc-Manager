@@ -3,7 +3,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db_session
@@ -60,13 +60,15 @@ def create_user(
 def list_users_route(
     current_user: Annotated[AuthenticatedUser, Depends(require_permission())],
     session: Annotated[Session, Depends(get_db_session)],
-    page: int = 1,
-    page_size: int = 50,
+    page: int = Query(default=1, ge=1, description="Page number (1-based)"),
+    page_size: int = Query(default=50, ge=1, le=200, description="Items per page"),
 ) -> UserListResponse:
     items, total = list_all_users(session, page=page, page_size=page_size)
     return UserListResponse(
         items=[UserResponse(**item) for item in items],
         total=total,
+        page=page,
+        page_size=page_size,
     )
 
 

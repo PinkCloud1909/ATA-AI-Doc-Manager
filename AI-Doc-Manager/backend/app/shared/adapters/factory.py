@@ -1,6 +1,5 @@
 import os
 from functools import lru_cache
-from typing import Optional
 
 from app.core.config import Settings, get_settings
 from app.shared.adapters.chroma_vector_adapter import ChromaVectorAdapter
@@ -13,30 +12,30 @@ from app.shared.interfaces import ILLMProvider, IObjectStorage, IVectorStore
 
 
 @lru_cache()
-def get_object_storage(settings: Optional[Settings] = None) -> IObjectStorage:
+def get_object_storage(settings: Settings | None = None) -> IObjectStorage:
     settings = settings or get_settings()
     env = os.getenv("ENV", "local").lower()
-    
+
     if env == "prod":
         return GCSStorageAdapter(settings)
     return MinioStorageAdapter(settings)
 
 
 @lru_cache()
-def get_vector_store(settings: Optional[Settings] = None) -> IVectorStore:
+def get_vector_store(settings: Settings | None = None) -> IVectorStore:
     settings = settings or get_settings()
     env = os.getenv("ENV", "local").lower()
-    
+
     if env == "prod":
         return VertexVectorAdapter(settings)
     return ChromaVectorAdapter(settings)
 
 
 @lru_cache()
-def get_llm_provider(settings: Optional[Settings] = None) -> ILLMProvider:
+def get_llm_provider(settings: Settings | None = None) -> ILLMProvider:
     settings = settings or get_settings()
     env = os.getenv("ENV", "local").lower()
-    
+
     if env == "prod":
         return VertexAILlmAdapter(settings)
     return GoogleAILlmAdapter(settings)

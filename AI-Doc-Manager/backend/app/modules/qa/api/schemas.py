@@ -1,9 +1,8 @@
-from typing import Optional
 from pydantic import BaseModel, Field
 
 
 class ChatRequest(BaseModel):
-    session_id: Optional[str] = Field(None, description="A unique identifier for the chat session. If not provided, a new session will be created.")
+    session_id: str | None = Field(None, description="A unique identifier for the chat session. If not provided, a new session will be created.")
     message: str = Field(..., description="The user's message to the agent")
 
 

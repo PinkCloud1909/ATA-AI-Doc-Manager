@@ -1,7 +1,6 @@
 import uuid
-from datetime import datetime, timedelta
-from typing import Any, Optional
-
+from datetime import datetime, timedelta, timezone
+from typing import Any
 from google.cloud import storage
 
 from app.core.config import Settings, get_settings
@@ -11,7 +10,7 @@ from app.shared.utils import safe_filename
 
 
 class GCSStorageAdapter(IObjectStorage):
-    def __init__(self, settings: Optional[Settings] = None) -> None:
+    def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
         self.bucket_name = self.settings.gcs_bucket_name
         self.client = storage.Client(project=self.settings.gcp_project_id)
@@ -21,12 +20,12 @@ class GCSStorageAdapter(IObjectStorage):
         if not self.bucket.exists():
             self.bucket.create(location=self.settings.gcp_location or "US")
 
-    def upload_file(self, file_path: str, object_key: str, content_type: Optional[str] = None) -> str:
+    def upload_file(self, file_path: str, object_key: str, content_type: str | None = None) -> str:
         blob = self.bucket.blob(object_key)
         blob.upload_from_filename(file_path, content_type=content_type)
         return self._build_reference(bucket_name=self.bucket_name, object_key=object_key)
 
-    def upload_fileobj(self, file_obj: Any, object_key: str, content_type: Optional[str] = None, length: int = -1) -> str:
+    def upload_fileobj(self, file_obj: Any, object_key: str, content_type: str | None = None, length: int = -1) -> str:
         blob = self.bucket.blob(object_key)
         blob.upload_from_file(file_obj, content_type=content_type or "application/octet-stream")
         return self._build_reference(bucket_name=self.bucket_name, object_key=object_key)
@@ -36,7 +35,7 @@ class GCSStorageAdapter(IObjectStorage):
         blob = self.client.bucket(bucket_name).get_blob(object_key)
         return blob
 
-    def generate_presigned_download_url(self, object_reference: str, expires: Optional[timedelta] = None) -> str:
+    def generate_presigned_download_url(self, object_reference: str, expires: timedelta | None = None) -> str:
         bucket_name, object_key = self._parse_reference(object_reference)
         blob = self.client.bucket(bucket_name).blob(object_key)
         ttl = expires or timedelta(minutes=self.settings.minio_presigned_expiry_minutes)
@@ -55,7 +54,7 @@ class GCSStorageAdapter(IObjectStorage):
 
     def build_object_key(self, filename: str, prefix: str = "documents") -> str:
         safe_name = safe_filename(filename)
-        dated_prefix = datetime.utcnow().strftime("%Y/%m/%d")
+        dated_prefix = datetime.now(timezone.utc).strftime("%Y/%m/%d")
         normalized_prefix = prefix.strip("/")
         return f"{normalized_prefix}/{dated_prefix}/{uuid.uuid4().hex}-{safe_name}"
 

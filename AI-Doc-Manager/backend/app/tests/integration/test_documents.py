@@ -1,9 +1,12 @@
 import io
 import uuid
-from unittest.mock import MagicMock, patch
+from contextlib import contextmanager
+from unittest.mock import MagicMock
 
 import pytest
 
+from app.main import app
+from app.modules.documents.api.router import _get_storage
 from app.modules.documents.domain.models import Document
 from app.shared.enums import DocumentType, Status
 from app.shared.utils import utcnow
@@ -11,6 +14,21 @@ from app.shared.utils import utcnow
 
 MOCK_FILE_LINK = "minio://documents/documents/2026/05/01/abc123-test.pdf"
 MOCK_DOWNLOAD_URL = "http://localhost:9000/documents/documents/2026/05/01/abc123-test.pdf?presigned=1"
+
+
+@contextmanager
+def _override_storage(mock_adapter):
+    """Temporarily replace the _get_storage FastAPI dependency with a mock.
+
+    @patch cannot intercept FastAPI Depends() because Depends() captures the
+    function reference at route-definition time.  Using dependency_overrides is
+    the correct FastAPI-idiomatic approach.
+    """
+    app.dependency_overrides[_get_storage] = lambda: mock_adapter
+    try:
+        yield mock_adapter
+    finally:
+        app.dependency_overrides.pop(_get_storage, None)
 
 
 def _login_admin(client) -> str:
@@ -51,21 +69,20 @@ def _create_test_document(db_session, user_id=None) -> Document:
 
 
 class TestUploadDocument:
-    @patch("app.modules.documents.api.router._get_storage")
-    def test_upload_success(self, mock_get_storage, client, db_session):
+    def test_upload_success(self, client, db_session):
         mock_adapter = MagicMock()
         mock_adapter.build_object_key.return_value = "documents/2026/05/01/abc-test.pdf"
         mock_adapter.upload_fileobj.return_value = MOCK_FILE_LINK
-        mock_get_storage.return_value = mock_adapter
 
         token = _login_admin(client)
         file_data = b"fake pdf content"
-        response = client.post(
-            "/api/v1/documents/upload",
-            headers=_auth_header(token),
-            files={"file": ("test.pdf", io.BytesIO(file_data), "application/pdf")},
-            data={"document_type": "report", "title": "My Report"},
-        )
+        with _override_storage(mock_adapter):
+            response = client.post(
+                "/api/v1/documents/upload",
+                headers=_auth_header(token),
+                files={"file": ("test.pdf", io.BytesIO(file_data), "application/pdf")},
+                data={"document_type": "report", "title": "My Report"},
+            )
 
         assert response.status_code == 201
         payload = response.json()
@@ -76,20 +93,19 @@ class TestUploadDocument:
         assert payload["version"] == 1
         assert payload["file_size"] == len(file_data)
 
-    @patch("app.modules.documents.api.router._get_storage")
-    def test_upload_default_title(self, mock_get_storage, client):
+    def test_upload_default_title(self, client):
         mock_adapter = MagicMock()
         mock_adapter.build_object_key.return_value = "documents/2026/05/01/abc-test.pdf"
         mock_adapter.upload_fileobj.return_value = MOCK_FILE_LINK
-        mock_get_storage.return_value = mock_adapter
 
         token = _login_admin(client)
-        response = client.post(
-            "/api/v1/documents/upload",
-            headers=_auth_header(token),
-            files={"file": ("report.pdf", io.BytesIO(b"data"), "application/pdf")},
-            data={"document_type": "report"},
-        )
+        with _override_storage(mock_adapter):
+            response = client.post(
+                "/api/v1/documents/upload",
+                headers=_auth_header(token),
+                files={"file": ("report.pdf", io.BytesIO(b"data"), "application/pdf")},
+                data={"document_type": "report"},
+            )
 
         assert response.status_code == 201
         assert response.json()["title"] == "report.pdf"
@@ -168,18 +184,17 @@ class TestListDocuments:
 
 
 class TestGetDocument:
-    @patch("app.modules.documents.api.router._get_storage")
-    def test_get_detail(self, mock_get_storage, client, db_session):
+    def test_get_detail(self, client, db_session):
         mock_adapter = MagicMock()
         mock_adapter.generate_presigned_download_url.return_value = MOCK_DOWNLOAD_URL
-        mock_get_storage.return_value = mock_adapter
 
         doc = _create_test_document(db_session)
         token = _login_admin(client)
-        response = client.get(
-            f"/api/v1/documents/{doc.id}",
-            headers=_auth_header(token),
-        )
+        with _override_storage(mock_adapter):
+            response = client.get(
+                f"/api/v1/documents/{doc.id}",
+                headers=_auth_header(token),
+            )
 
         assert response.status_code == 200
         payload = response.json()
@@ -253,38 +268,36 @@ class TestSoftDeleteDocument:
 
 
 class TestHardDeleteDocument:
-    @patch("app.modules.documents.api.router._get_storage")
-    def test_permanent_delete(self, mock_get_storage, client, db_session):
+    def test_permanent_delete(self, client, db_session):
         mock_adapter = MagicMock()
-        mock_get_storage.return_value = mock_adapter
 
         doc = _create_test_document(db_session)
         doc_id = doc.id
         token = _login_admin(client)
-        response = client.delete(
-            f"/api/v1/documents/{doc_id}/permanent",
-            headers=_auth_header(token),
-        )
+        with _override_storage(mock_adapter):
+            response = client.delete(
+                f"/api/v1/documents/{doc_id}/permanent",
+                headers=_auth_header(token),
+            )
 
         assert response.status_code == 200
         assert response.json()["detail"] == "Document permanently deleted"
 
 
 class TestNewVersion:
-    @patch("app.modules.documents.api.router._get_storage")
-    def test_create_new_version(self, mock_get_storage, client, db_session):
+    def test_create_new_version(self, client, db_session):
         mock_adapter = MagicMock()
         mock_adapter.build_object_key.return_value = "documents/2026/05/01/abc-v2.pdf"
         mock_adapter.upload_fileobj.return_value = MOCK_FILE_LINK
-        mock_get_storage.return_value = mock_adapter
 
         doc = _create_test_document(db_session)
         token = _login_admin(client)
-        response = client.post(
-            f"/api/v1/documents/{doc.id}/new-version",
-            headers=_auth_header(token),
-            files={"file": ("v2.pdf", io.BytesIO(b"v2 content"), "application/pdf")},
-        )
+        with _override_storage(mock_adapter):
+            response = client.post(
+                f"/api/v1/documents/{doc.id}/new-version",
+                headers=_auth_header(token),
+                files={"file": ("v2.pdf", io.BytesIO(b"v2 content"), "application/pdf")},
+            )
 
         assert response.status_code == 201
         payload = response.json()
@@ -292,21 +305,20 @@ class TestNewVersion:
         assert payload["document_group_id"] == str(doc.document_group_id)
         assert payload["title"] == "Test Document"  # inherits from source
 
-    @patch("app.modules.documents.api.router._get_storage")
-    def test_new_version_with_custom_title(self, mock_get_storage, client, db_session):
+    def test_new_version_with_custom_title(self, client, db_session):
         mock_adapter = MagicMock()
         mock_adapter.build_object_key.return_value = "documents/2026/05/01/abc-v2.pdf"
         mock_adapter.upload_fileobj.return_value = MOCK_FILE_LINK
-        mock_get_storage.return_value = mock_adapter
 
         doc = _create_test_document(db_session)
         token = _login_admin(client)
-        response = client.post(
-            f"/api/v1/documents/{doc.id}/new-version",
-            headers=_auth_header(token),
-            files={"file": ("v2.pdf", io.BytesIO(b"v2"), "application/pdf")},
-            data={"title": "Version 2 Title"},
-        )
+        with _override_storage(mock_adapter):
+            response = client.post(
+                f"/api/v1/documents/{doc.id}/new-version",
+                headers=_auth_header(token),
+                files={"file": ("v2.pdf", io.BytesIO(b"v2"), "application/pdf")},
+                data={"title": "Version 2 Title"},
+            )
 
         assert response.status_code == 201
         assert response.json()["title"] == "Version 2 Title"

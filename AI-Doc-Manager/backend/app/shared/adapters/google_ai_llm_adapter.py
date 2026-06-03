@@ -1,5 +1,4 @@
 import logging
-from typing import List, Optional
 
 from google import genai
 from google.genai import types
@@ -11,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class GoogleAILlmAdapter(ILLMProvider):
-    def __init__(self, settings: Optional[Settings] = None) -> None:
+    def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
         # NOTE: Config field is `google_api_key` (not `google_ai_api_key`)
         api_key = getattr(self.settings, "google_api_key", None)
@@ -23,9 +22,9 @@ class GoogleAILlmAdapter(ILLMProvider):
 
     def generate_embeddings(
         self,
-        texts: List[str],
+        texts: list[str],
         task_type: str = "RETRIEVAL_DOCUMENT",
-    ) -> List[List[float]]:
+    ) -> list[list[float]]:
         """Generate embeddings for a list of text chunks.
 
         embed_content() with a list of strings always returns
@@ -50,7 +49,7 @@ class GoogleAILlmAdapter(ILLMProvider):
         )
         return embeddings
 
-    def generate_response(self, prompt: str, context: List[str]) -> str:
+    def generate_response(self, prompt: str, context: list[str]) -> str:
         """Generate a grounded answer from the provided context chunks."""
         context_str = "\n\n".join(context)
         full_prompt = (

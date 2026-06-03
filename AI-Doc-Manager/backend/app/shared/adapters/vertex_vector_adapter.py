@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from google.cloud import aiplatform
 
@@ -8,7 +8,7 @@ from app.shared.interfaces import IVectorStore
 
 
 class VertexVectorAdapter(IVectorStore):
-    def __init__(self, settings: Optional[Settings] = None) -> None:
+    def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
         aiplatform.init(
             project=self.settings.gcp_project_id,
@@ -18,18 +18,18 @@ class VertexVectorAdapter(IVectorStore):
         self.index_endpoint_id = getattr(self.settings, "vertex_index_endpoint_id", None)
         self.deployed_index_id = getattr(self.settings, "vertex_deployed_index_id", None)
         self.index_id = getattr(self.settings, "vertex_index_id", None)
-        
+
         if self.index_endpoint_id:
             self.index_endpoint = aiplatform.MatchingEngineIndexEndpoint(self.index_endpoint_id)
         if self.index_id:
             self.index = aiplatform.MatchingEngineIndex(self.index_id)
 
     def upsert_document(
-        self, document_id: str, text_chunks: List[str], embeddings: List[List[float]], metadata: Optional[Dict] = None
+        self, document_id: str, text_chunks: list[str], embeddings: list[list[float]], metadata: dict | None = None
     ) -> None:
         if not text_chunks or not self.index:
             return
-            
+
         datapoints = []
         for i, (chunk, embedding) in enumerate(zip(text_chunks, embeddings)):
             datapoint_id = f"{document_id}_{i}"
@@ -47,22 +47,22 @@ class VertexVectorAdapter(IVectorStore):
 
         # Upsert to the streaming index
         self.index.upsert_datapoints(datapoints=datapoints)
-        
+
         # Note: We must also store the text chunk payload somewhere (e.g., GCS, Datastore, or Postgres)
         # because Vertex AI Vector Search only stores vectors and string IDs by default.
         # This is a common pattern: Vector DB returns ID, then you fetch the text from Postgres/GCS.
         # Alternatively, Vertex Vector Search now supports storing small amounts of string data via `crowding_tag` or custom names.
 
-    def semantic_search(self, query_embedding: List[float], top_k: int = 5) -> List[Dict[str, Any]]:
+    def semantic_search(self, query_embedding: list[float], top_k: int = 5) -> list[dict[str, Any]]:
         if not self.index_endpoint_id:
             return []
-            
+
         response = self.index_endpoint.find_neighbors(
             deployed_index_id=self.deployed_index_id,
             queries=[query_embedding],
             num_neighbors=top_k,
         )
-        
+
         matches = []
         if response:
             for neighbor in response[0]:
@@ -70,7 +70,7 @@ class VertexVectorAdapter(IVectorStore):
                 matches.append({
                     "id": neighbor.id,
                     "score": neighbor.distance,
-                    "text": f"Text chunk for {neighbor.id} (needs DB fetch)", 
+                    "text": f"Text chunk for {neighbor.id} (needs DB fetch)",
                 })
         return matches
 

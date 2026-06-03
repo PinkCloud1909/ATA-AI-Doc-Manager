@@ -1,6 +1,5 @@
 """Pydantic schemas for admin user & role management API."""
 
-from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -25,6 +24,8 @@ class UserResponse(BaseModel):
 class UserListResponse(BaseModel):
     items: list[UserResponse]
     total: int
+    page: int
+    page_size: int
 
 
 class RoleResponse(BaseModel):

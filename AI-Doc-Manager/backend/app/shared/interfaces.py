@@ -1,7 +1,7 @@
 import uuid
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class IObjectStorage(ABC):
@@ -12,11 +12,11 @@ class IObjectStorage(ABC):
         pass
 
     @abstractmethod
-    def upload_file(self, file_path: str, object_key: str, content_type: Optional[str] = None) -> str:
+    def upload_file(self, file_path: str, object_key: str, content_type: str | None = None) -> str:
         pass
 
     @abstractmethod
-    def upload_fileobj(self, file_obj: Any, object_key: str, content_type: Optional[str] = None, length: int = -1) -> str:
+    def upload_fileobj(self, file_obj: Any, object_key: str, content_type: str | None = None, length: int = -1) -> str:
         pass
 
     @abstractmethod
@@ -24,7 +24,7 @@ class IObjectStorage(ABC):
         pass
 
     @abstractmethod
-    def generate_presigned_download_url(self, object_reference: str, expires: Optional[timedelta] = None) -> str:
+    def generate_presigned_download_url(self, object_reference: str, expires: timedelta | None = None) -> str:
         pass
 
     @abstractmethod
@@ -45,11 +45,11 @@ class IVectorStore(ABC):
     """Port for vector database operations (e.g. ChromaDB, Vertex AI Vector Search)."""
 
     @abstractmethod
-    def upsert_document(self, document_id: str, text_chunks: List[str], embeddings: List[List[float]], metadata: Optional[Dict] = None) -> None:
+    def upsert_document(self, document_id: str, text_chunks: list[str], embeddings: list[list[float]], metadata: dict | None = None) -> None:
         pass
 
     @abstractmethod
-    def semantic_search(self, query_embedding: List[float], top_k: int = 5) -> List[Dict[str, Any]]:
+    def semantic_search(self, query_embedding: list[float], top_k: int = 5) -> list[dict[str, Any]]:
         pass
 
     @abstractmethod
@@ -63,9 +63,9 @@ class ILLMProvider(ABC):
     @abstractmethod
     def generate_embeddings(
         self,
-        texts: List[str],
+        texts: list[str],
         task_type: str = "RETRIEVAL_DOCUMENT",
-    ) -> List[List[float]]:
+    ) -> list[list[float]]:
         """Generate embeddings for a list of texts.
 
         Args:
@@ -79,5 +79,5 @@ class ILLMProvider(ABC):
         pass
 
     @abstractmethod
-    def generate_response(self, prompt: str, context: List[str]) -> str:
+    def generate_response(self, prompt: str, context: list[str]) -> str:
         pass

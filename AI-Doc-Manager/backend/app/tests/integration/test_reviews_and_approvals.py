@@ -136,4 +136,7 @@ def test_create_review_and_list(client, db_session):
         headers=headers,
     )
     assert list_response.status_code == 200
-    assert len(list_response.json()) == 1
+    data = list_response.json()
+    assert data["total"] == 1
+    assert len(data["items"]) == 1
+    assert data["page"] == 1
