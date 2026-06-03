@@ -49,6 +49,13 @@ export default function Sidebar() {
       show: perm.canApprove,
     },
     { href: "/chat", label: "AI Chat", icon: "forum" },
+    { href: "/notifications", label: "Notifications", icon: "notifications" },
+    {
+      href: "/admin/users",
+      label: "User Management",
+      icon: "manage_accounts",
+      show: perm.canAdmin,
+    },
   ];
 
   const visibleItems = navItems.filter((i) => i.show !== false);
@@ -196,17 +203,14 @@ export default function Sidebar() {
             <div className="w-9 h-9 rounded-full bg-surface-dim overflow-hidden flex-shrink-0">
               <img
                 className="w-full h-full object-cover"
-                src={
-                  user?.photoURL ||
-                  "https://lh3.googleusercontent.com/aida-public/AB6AXuBuyuu8zmjPttIZPT3lGPo8DgSzcg7XZ1dUU2QchCDRKEjAjnQbJ7AwNGG8ODe2_JP_Hnwd_G5Y_dlXw30_-R5iUIo-ehH9KkWb1ugTW6mix2wQ6HEXzvhXMLR6HQoXHd0TpocZjhVwMK7S4vl-2L_pQmMBCB_8pAtQmEX7RDes8OQi9u7N0anfTkx6Olp0dOyHmR3V4u6rl8nYEnIOxTnmFF21C44lWo98Ju4VIhiHhnL-T1e90xB9mcRBTFEKYHV7yUcYcL3B_kD_"
-                }
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuBuyuu8zmjPttIZPT3lGPo8DgSzcg7XZ1dUU2QchCDRKEjAjnQbJ7AwNGG8ODe2_JP_Hnwd_G5Y_dlXw30_-R5iUIo-ehH9KkWb1ugTW6mix2wQ6HEXzvhXMLR6HQoXHd0TpocZjhVwMK7S4vl-2L_pQmMBCB_8pAtQmEX7RDes8OQi9u7N0anfTkx6Olp0dOyHmR3V4u6rl8nYEnIOxTnmFF21C44lWo98Ju4VIhiHhnL-T1e90xB9mcRBTFEKYHV7yUcYcL3B_kD_"
                 alt="User avatar"
               />
             </div>
             {isHovered && (
               <div className="min-w-0">
                 <p className="text-sm font-bold text-on-surface truncate">
-                  {user?.displayName || "Người dùng"}
+                  {user?.username || user?.email || "User"}
                 </p>
                 <p className="text-[10px] text-on-surface-variant truncate uppercase">
                   {perm.canAdmin ? "QUẢN TRỊ VIÊN" : "USER"}

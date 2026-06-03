@@ -6,6 +6,9 @@ import { usePermission } from "@/hooks/usePermission";
 export default function ProfileSummary() {
   const { user } = useAuth();
   const perm = usePermission();
+  const displayName = user?.username || user?.email || "User";
+  const avatarUrl =
+    "https://lh3.googleusercontent.com/aida-public/AB6AXuAcl8Sz-olylOJMn5YM7l7VUL_fiz67_xpomcCZWCvmZ7ghS0OZpAjgWC0aQSXXrL0gskjhgRSkKdhsJuvSaFuccMpfSZ_VIB2An0wGqbPYJcH5o1si2vgy13pVRFvlknT02CFuvM4f-wHyLelQcqbHv3WpJlAfhnHY7W3sIFVioMjQk5zhse48UGZVq3q86vORbkvaevBC9Q1IVbi0dJWGjQSMfGRVl_FUi_HVE2s4KQpo4GrKI9R-Wqulqe5AEJCBBr38Isj_5055";
 
   return (
     <div className="lg:col-span-4 flex flex-col gap-6">
@@ -15,19 +18,16 @@ export default function ProfileSummary() {
         <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-surface-container-low to-transparent -z-10"></div>
         <div className="relative mb-6">
           <img
-            alt={user?.displayName || "Người dùng"}
+            alt={displayName}
             className="w-32 h-32 rounded-full object-cover border-4 border-surface-container-lowest shadow-[0_4px_6px_-1px_rgba(43,52,55,0.04),0_10px_15px_-3px_rgba(43,52,55,0.08)]"
-            src={
-              user?.photoURL ||
-              "https://lh3.googleusercontent.com/aida-public/AB6AXuAcl8Sz-olylOJMn5YM7l7VUL_fiz67_xpomcCZWCvmZ7ghS0OZpAjgWC0aQSXXrL0gskjhgRSkKdhsJuvSaFuccMpfSZ_VIB2An0wGqbPYJcH5o1si2vgy13pVRFvlknT02CFuvM4f-wHyLelQcqbHv3WpJlAfhnHY7W3sIFVioMjQk5zhse48UGZVq3q86vORbkvaevBC9Q1IVbi0dJWGjQSMfGRVl_FUi_HVE2s4KQpo4GrKI9R-Wqulqe5AEJCBBr38Isj_5055"
-            }
+            src={avatarUrl}
           />
           <button className="absolute bottom-1 right-1 w-8 h-8 bg-surface-container-lowest border border-outline-variant/20 rounded-full flex items-center justify-center text-on-surface-variant hover:text-tertiary hover:border-tertiary/30 transition-all shadow-sm">
             <span className="material-symbols-outlined text-[18px]">edit</span>
           </button>
         </div>
         <h3 className="font-headline text-xl font-bold text-on-background mb-1">
-          {user?.displayName || "Người dùng"}
+          {displayName}
         </h3>
         <span className="inline-flex items-center px-3 py-1 rounded-full bg-tertiary-container/10 text-tertiary text-xs font-semibold tracking-wide uppercase mt-2">
           {perm.canAdmin ? "Quản trị viên" : "Người dùng"}

@@ -49,3 +49,15 @@ def list_reviews(session: Session, document_id: UUID) -> list[DocumentReview]:
         .scalars()
         .all()
     )
+
+
+def list_all_reviews(session: Session) -> list[DocumentReview]:
+    """Get all reviews across all documents"""
+    return (
+        session.execute(
+            select(DocumentReview)
+            .order_by(DocumentReview.created_date.desc())
+        )
+        .scalars()
+        .all()
+    )

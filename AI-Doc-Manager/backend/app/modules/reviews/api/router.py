@@ -8,9 +8,10 @@ from app.core.db import get_db_session
 from app.core.dependencies import require_permission
 from app.modules.iam.domain.principal import AuthenticatedUser
 from app.modules.reviews.api.schemas import ReviewCreateRequest, ReviewResponse
-from app.modules.reviews.application.services import create_review, list_reviews
+from app.modules.reviews.application.services import create_review, list_reviews, list_all_reviews
 
 router = APIRouter(prefix="/api/v1/documents", tags=["reviews"])
+reviews_router = APIRouter(prefix="/api/v1/reviews", tags=["reviews"])
 
 
 @router.post(
@@ -52,6 +53,29 @@ def get_reviews(
     session: Annotated[Session, Depends(get_db_session)],
 ) -> list[ReviewResponse]:
     reviews = list_reviews(session, document_id=document_id)
+    return [
+        ReviewResponse(
+            id=review.id,
+            document_id=review.document_id,
+            user_id=review.user_id,
+            grade=review.grade,
+            comment=review.comment,
+            created_date=review.created_date,
+        )
+        for review in reviews
+    ]
+
+
+@reviews_router.get(
+    "",
+    response_model=list[ReviewResponse],
+    status_code=status.HTTP_200_OK,
+)
+def get_all_reviews(
+    current_user: Annotated[AuthenticatedUser, Depends(require_permission())],
+    session: Annotated[Session, Depends(get_db_session)],
+) -> list[ReviewResponse]:
+    reviews = list_all_reviews(session)
     return [
         ReviewResponse(
             id=review.id,

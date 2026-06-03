@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/hooks/useAuth";
+import Link from "next/link";
 
 export default function Header() {
   const { user, logout } = useAuth();
@@ -26,12 +27,17 @@ export default function Header() {
             type="text"
           />
         </div>
-        <button
-          className="material-symbols-outlined p-2 text-on-surface-variant hover:bg-surface-container rounded-md"
-          data-icon="notifications"
+        <Link
+          href="/notifications"
+          className="relative p-2 text-on-surface-variant hover:bg-surface-container rounded-md"
+          aria-label="Open notifications"
+          title="Notifications"
         >
-          notifications
-        </button>
+          <span className="material-symbols-outlined block" data-icon="notifications">
+            notifications
+          </span>
+          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-tertiary ring-2 ring-white" />
+        </Link>
       </div>
     </header>
   );

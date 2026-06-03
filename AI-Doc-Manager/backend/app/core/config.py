@@ -2,7 +2,7 @@ from functools import lru_cache
 import os
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     database_url: str = (
         "postgresql+psycopg://postgres:postgres@localhost:5432/dms_backend"
     )
+    async_database_url: str | None = None
 
     jwt_secret_key: str = "change-me"
     jwt_algorithm: str = "HS256"
@@ -48,6 +49,13 @@ class Settings(BaseSettings):
     default_admin_password: str = Field(default="admin123", min_length=8)
     default_admin_role_name: str = Field(default="admin", max_length=50)
     default_user_role_name: str = Field(default="user", max_length=50)
+
+    @field_validator("debug", mode="before")
+    @classmethod
+    def parse_debug(cls, value):
+        if isinstance(value, str) and value.lower() in {"release", "prod", "production"}:
+            return False
+        return value
 
 
 @lru_cache

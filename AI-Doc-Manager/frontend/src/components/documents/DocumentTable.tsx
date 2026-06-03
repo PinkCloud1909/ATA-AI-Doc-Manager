@@ -9,9 +9,10 @@ import {
 import { StatusBadge } from "./StatusBadge";
 /*
 const TYPE_LABEL: Record<DocumentType, string> = {
-  [DocumentType.TEMPLATE]:          "Template",
-  [DocumentType.CUSTOMER_SPECIFIC]: "Khách hàng",
-  [DocumentType.COMMON_GUIDE]:      "Hướng dẫn chung",
+  [DocumentType.POLICY]: "Chính sách",
+  [DocumentType.MANUAL]: "Hướng dẫn",
+  [DocumentType.REPORT]: "Báo cáo",
+  [DocumentType.OTHER]:  "Khác",
 }
 
 interface Props {

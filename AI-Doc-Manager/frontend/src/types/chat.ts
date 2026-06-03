@@ -34,6 +34,7 @@ export interface ChatRequest {
 
 export interface ChatResponse {
   answer:      string
+  response?:   string
   sources:     SourceReference[]
   is_from_kb:  boolean
   session_id:  string

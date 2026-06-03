@@ -3,6 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
+    BigInteger,
     DateTime,
     Enum,
     ForeignKey,
@@ -40,8 +41,14 @@ class Document(Base):
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     document_type: Mapped[DocumentType] = mapped_column(document_type_enum, nullable=False)
     status: Mapped[Status] = mapped_column(status_enum, nullable=False)
+    title: Mapped[str] = mapped_column(String(500), nullable=False, default="Untitled")
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    original_filename: Mapped[str] = mapped_column(String(500), nullable=False, default="unknown")
     file_link: Mapped[str] = mapped_column(String(500), nullable=False)
+    file_size: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    content_type: Mapped[str | None] = mapped_column(String(200), nullable=True)
     is_vectorized: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    vertex_index_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         Uuid,
         ForeignKey("users.id"),

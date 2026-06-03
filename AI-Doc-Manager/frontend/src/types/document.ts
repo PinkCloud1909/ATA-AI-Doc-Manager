@@ -1,17 +1,19 @@
 // types/document.ts
 
 export enum DocumentStatus {
-  DRAFT          = "DRAFT",
-  PENDING_REVIEW = "PENDING_REVIEW",
-  APPROVED       = "APPROVED",
-  REJECTED       = "REJECTED",
-  EXPIRED        = "EXPIRED",
+  DRAFT          = "draft",
+  PENDING_REVIEW = "pending_review",
+  APPROVED       = "approved",
+  REJECTED       = "rejected",
+  EXPIRED        = "expired",
+  ARCHIVED       = "archived",
 }
 
 export enum DocumentType {
-  TEMPLATE          = "TEMPLATE",
-  CUSTOMER_SPECIFIC = "CUSTOMER_SPECIFIC",
-  COMMON_GUIDE      = "COMMON_GUIDE",
+  POLICY = "policy",
+  MANUAL = "manual",
+  REPORT = "report",
+  OTHER  = "other",
 }
 
 export interface DocumentReview {
@@ -30,6 +32,8 @@ export interface Document {
   version:            number
   document_type:      DocumentType
   status:             DocumentStatus
+  title:              string
+  description?:       string | null
 
   // GCS: file_link là gs://bucket/path hoặc https://storage.googleapis.com/...
   file_link:          string
@@ -40,7 +44,7 @@ export interface Document {
   is_vectorized:      boolean       // đã index vào Vertex AI Vector Search chưa
   vertex_index_id?:   string        // Vertex AI Matching Engine index ID
 
-  created_by:         string
+  created_by?:        string | null
   created_by_name?:   string
   created_at:         string
   modified_by?:       string
@@ -52,10 +56,13 @@ export interface Document {
 
 export interface DocumentListItem {
   id:                string
+  document_id?:      string
   document_group_id: string
   version:           number
   document_type:     DocumentType
   status:            DocumentStatus
+  title:             string
+  description?:      string | null
   file_link:         string
   original_filename: string
   size_bytes?:       number

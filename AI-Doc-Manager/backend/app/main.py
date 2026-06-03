@@ -12,8 +12,10 @@ from app.core.db import get_db_session, ping_database
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import clear_request_id, configure_logging, set_request_id
 from app.modules.documents.api.router import approvals_router, documents_router
+from app.modules.generate.api.router import router as generate_router
 from app.modules.iam.api.router import router as auth_router
-from app.modules.reviews.api.router import router as reviews_router
+from app.modules.qa.api.router import chat_router, router as qa_router
+from app.modules.reviews.api.router import router as reviews_router, reviews_router as reviews_detail_router
 from app.shared.schemas import HealthResponse, ReadyResponse
 from app.shared.utils import generate_request_id
 
@@ -39,6 +41,10 @@ app.include_router(auth_router)
 app.include_router(documents_router)
 app.include_router(approvals_router)
 app.include_router(reviews_router)
+app.include_router(reviews_detail_router)
+app.include_router(qa_router)
+app.include_router(chat_router)
+app.include_router(generate_router)
 
 
 @app.middleware("http")

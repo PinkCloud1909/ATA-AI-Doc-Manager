@@ -6,6 +6,7 @@ const CONFIG: Record<DocumentStatus, { label: string; className: string }> = {
   [DocumentStatus.APPROVED]:       { label: "Đã duyệt",     className: "bg-emerald-100 text-emerald-700" },
   [DocumentStatus.REJECTED]:       { label: "Từ chối",      className: "bg-red-100 text-red-600" },
   [DocumentStatus.EXPIRED]:        { label: "Hết hạn",      className: "bg-slate-100 text-slate-400 line-through" },
+  [DocumentStatus.ARCHIVED]:       { label: "Lưu trữ",      className: "bg-slate-100 text-slate-500" },
 }
 
 export function StatusBadge({ status }: { status: DocumentStatus }) {

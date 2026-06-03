@@ -15,7 +15,7 @@ interface GenerateResult {
 
 export default function GeneratePage() {
   const [prompt,  setPrompt]  = useState("")
-  const [docType, setDocType] = useState<DocumentType>(DocumentType.COMMON_GUIDE)
+  const [docType, setDocType] = useState<DocumentType>(DocumentType.MANUAL)
   const [result,  setResult]  = useState<GenerateResult | null>(null)
 
   const generate = useMutation({
@@ -52,9 +52,10 @@ export default function GeneratePage() {
             className="block w-full px-3 py-2 text-sm border border-slate-300 rounded-lg
                        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
           >
-            <option value={DocumentType.COMMON_GUIDE}>Hướng dẫn chung</option>
-            <option value={DocumentType.TEMPLATE}>Template</option>
-            <option value={DocumentType.CUSTOMER_SPECIFIC}>Tài liệu khách hàng</option>
+            <option value={DocumentType.MANUAL}>Hướng dẫn / Runbook</option>
+            <option value={DocumentType.POLICY}>Chính sách</option>
+            <option value={DocumentType.REPORT}>Báo cáo</option>
+            <option value={DocumentType.OTHER}>Khác</option>
           </select>
         </div>
 

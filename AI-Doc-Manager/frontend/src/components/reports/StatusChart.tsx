@@ -66,9 +66,9 @@ export default function StatusChart() {
               fill="transparent"
               r="70"
               stroke="#e3e9ec"
-              stroke-dasharray="440"
-              stroke-dashoffset="0"
-              stroke-width="20"
+              strokeDasharray="440"
+              strokeDashoffset="0"
+              strokeWidth="20"
             ></circle>
             <circle
               cx="80"
@@ -76,9 +76,9 @@ export default function StatusChart() {
               fill="transparent"
               r="70"
               stroke="#c1c1c1"
-              stroke-dasharray="440"
-              stroke-dashoffset="20"
-              stroke-width="20"
+              strokeDasharray="440"
+              strokeDashoffset="20"
+              strokeWidth="20"
             ></circle>
             <circle
               cx="80"
@@ -86,9 +86,9 @@ export default function StatusChart() {
               fill="transparent"
               r="70"
               stroke="#5e5e5e"
-              stroke-dasharray="440"
-              stroke-dashoffset="44"
-              stroke-width="20"
+              strokeDasharray="440"
+              strokeDashoffset="44"
+              strokeWidth="20"
             ></circle>
             <circle
               cx="80"
@@ -96,9 +96,9 @@ export default function StatusChart() {
               fill="transparent"
               r="70"
               stroke="#0053dc"
-              stroke-dasharray="440"
-              stroke-dashoffset="154"
-              stroke-width="20"
+              strokeDasharray="440"
+              strokeDashoffset="154"
+              strokeWidth="20"
             ></circle>
           </svg>
           <div className="absolute text-center">

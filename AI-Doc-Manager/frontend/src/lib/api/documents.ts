@@ -1,47 +1,34 @@
-/**
- * lib/api/documents.ts
- *
- * Thay đổi so với kiến trúc MinIO:
- *  - Upload dùng 2 bước: signed-upload-url → PUT GCS → confirm-upload
- *  - file_link trả về là GCS path (gs://bucket/path) hoặc public HTTPS URL
- *  - Download dùng signed URL (nếu bucket private) hoặc public URL (nếu public)
- */
-
 import apiClient from "./client"
-import { uploadToGcs, SignedUploadUrlResponse } from "@/lib/gcs"
 import {
   Document,
   DocumentListItem,
   DocumentListParams,
-  PaginatedDocuments,
   DocumentType,
+  PaginatedDocuments,
 } from "@/types/document"
 
-// ── Types ────────────────────────────────────────────────────────────────────
-
 export interface UploadDocumentPayload {
-  file:               File
-  document_type:      DocumentType
-  document_group_id?: string     // omit = tài liệu mới; set = version mới
-}
-
-export interface ConfirmUploadPayload {
-  gcs_path:           string
-  original_filename:  string
-  content_type:       string
-  size_bytes:         number
-  document_type:      DocumentType
+  file: File
+  document_type: DocumentType
+  title?: string
+  description?: string
   document_group_id?: string
 }
 
-// ── API ──────────────────────────────────────────────────────────────────────
+function toFormData(payload: UploadDocumentPayload): FormData {
+  const form = new FormData()
+  form.append("file", payload.file)
+  form.append("document_type", payload.document_type)
+  if (payload.title) form.append("title", payload.title)
+  if (payload.description) form.append("description", payload.description)
+  return form
+}
 
 export const documentsApi = {
-
-  // ─── Listing & Detail ──────────────────────────────────────────────────────
-
   list: async (params?: DocumentListParams): Promise<PaginatedDocuments> => {
-    const { data } = await apiClient.get<PaginatedDocuments>("/documents", { params })
+    const { data } = await apiClient.get<PaginatedDocuments>("/documents", {
+      params,
+    })
     return data
   },
 
@@ -50,64 +37,13 @@ export const documentsApi = {
     return data
   },
 
-  getVersionHistory: async (groupId: string): Promise<DocumentListItem[]> => {
+  getVersionHistory: async (documentId: string): Promise<DocumentListItem[]> => {
     const { data } = await apiClient.get<DocumentListItem[]>(
-      `/documents/group/${groupId}`,
+      `/documents/${documentId}/versions`,
     )
-    return data
+    return data || []
   },
 
-  // ─── GCS Upload (2-step) ───────────────────────────────────────────────────
-
-  /**
-   * Bước 1: Yêu cầu backend tạo Signed URL
-   */
-  getSignedUploadUrl: async (
-    filename: string,
-    contentType: string,
-  ): Promise<SignedUploadUrlResponse> => {
-    const { data } = await apiClient.post<SignedUploadUrlResponse>(
-      "/documents/signed-upload-url",
-      { filename, content_type: contentType },
-    )
-    return data
-  },
-
-  /**
-   * Bước 2 + 3: Upload lên GCS rồi confirm với backend
-   */
-  upload: async (
-    payload: UploadDocumentPayload,
-    onProgress?: (pct: number) => void,
-  ): Promise<Document> => {
-    // 1. Lấy Signed URL từ backend
-    const { signed_url, gcs_path } = await documentsApi.getSignedUploadUrl(
-      payload.file.name,
-      payload.file.type,
-    )
-
-    // 2. PUT file trực tiếp lên GCS (bypass backend → giảm tải, tăng tốc)
-    await uploadToGcs(signed_url, payload.file, onProgress)
-
-    // 3. Báo backend lưu record vào PostgreSQL
-    const { data } = await apiClient.post<Document>("/documents/confirm-upload", {
-      gcs_path,
-      original_filename:  payload.file.name,
-      content_type:       payload.file.type,
-      size_bytes:         payload.file.size,
-      document_type:      payload.document_type,
-      document_group_id:  payload.document_group_id,
-    } satisfies ConfirmUploadPayload)
-
-    return data
-  },
-
-  // ─── Download (Signed URL cho private bucket) ─────────────────────────────
-
-  /**
-   * Lấy Signed URL để download (TTL 15 phút).
-   * Dùng khi bucket không public.
-   */
   getDownloadUrl: async (id: string): Promise<string> => {
     const { data } = await apiClient.get<{ download_url: string }>(
       `/documents/${id}/download-url`,
@@ -115,14 +51,74 @@ export const documentsApi = {
     return data.download_url
   },
 
-  // ─── Delete ───────────────────────────────────────────────────────────────
+  create: async (
+    file_link: string,
+    document_type: DocumentType,
+  ): Promise<Document> => {
+    const { data } = await apiClient.post<Document>("/documents", {
+      document_type,
+      file_link,
+    })
+    return data
+  },
+
+  createVersion: async (
+    documentId: string,
+    file: File,
+    title?: string,
+    description?: string,
+  ): Promise<Document> => {
+    const form = new FormData()
+    form.append("file", file)
+    if (title) form.append("title", title)
+    if (description) form.append("description", description)
+    const { data } = await apiClient.post<Document>(
+      `/documents/${documentId}/new-version`,
+      form,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    )
+    return data
+  },
+
+  upload: async (
+    payload: UploadDocumentPayload,
+    onProgress?: (pct: number) => void,
+  ): Promise<Document> => {
+    if (payload.document_group_id) {
+      return documentsApi.createVersion(
+        payload.document_group_id,
+        payload.file,
+        payload.title,
+        payload.description,
+      )
+    }
+
+    const { data } = await apiClient.post<Document>(
+      "/documents/upload",
+      toFormData(payload),
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (event) => {
+          if (event.total && onProgress) {
+            onProgress(Math.round((event.loaded / event.total) * 100))
+          }
+        },
+      },
+    )
+    return data
+  },
+
+  update: async (
+    id: string,
+    payload: Partial<Pick<Document, "title" | "description" | "document_type">>,
+  ): Promise<Document> => {
+    const { data } = await apiClient.put<Document>(`/documents/${id}`, payload)
+    return data
+  },
 
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/documents/${id}`)
-    // Backend sẽ xóa cả file trên GCS
   },
-
-  // ─── Reviews ─────────────────────────────────────────────────────────────
 
   createReview: async (id: string, grade: number, comment: string) => {
     const { data } = await apiClient.post(`/documents/${id}/reviews`, {
@@ -134,6 +130,41 @@ export const documentsApi = {
 
   getReviews: async (id: string) => {
     const { data } = await apiClient.get(`/documents/${id}/reviews`)
+    return data
+  },
+
+  getAllReviews: async () => {
+    const { data } = await apiClient.get("/reviews")
+    return data || []
+  },
+
+  getPendingApprovals: async () => {
+    const { data } = await apiClient.get("/approvals/pending")
+    return data || []
+  },
+
+  getApprovedDocuments: async () => {
+    const { data } = await apiClient.get("/approvals/approved")
+    return data || []
+  },
+
+  getRejectedDocuments: async () => {
+    const { data } = await apiClient.get("/approvals/rejected")
+    return data || []
+  },
+
+  submitForReview: async (id: string) => {
+    const { data } = await apiClient.post(`/documents/${id}/submit`)
+    return data
+  },
+
+  approve: async (id: string) => {
+    const { data } = await apiClient.post(`/documents/${id}/approve`)
+    return data
+  },
+
+  reject: async (id: string, reason: string) => {
+    const { data } = await apiClient.post(`/documents/${id}/reject`, { reason })
     return data
   },
 }

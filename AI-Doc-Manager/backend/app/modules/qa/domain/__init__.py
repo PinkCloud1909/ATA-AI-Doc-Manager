@@ -1,1 +1,1 @@
-"""QA domain placeholders."""
+"""QA domain package."""

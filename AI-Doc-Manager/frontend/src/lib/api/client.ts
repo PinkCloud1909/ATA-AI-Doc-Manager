@@ -1,54 +1,66 @@
-/**
- * lib/api/client.ts
- *
- * Axios instance với Firebase ID Token authentication.
- *
- * Khác với kiến trúc cũ (MinIO + custom JWT):
- *  - Token là Firebase ID Token (Google-issued, verify phía backend qua IAM)
- *  - Không cần refresh endpoint riêng → Firebase SDK tự rotate token
- *  - Khi token hết hạn, getCurrentIdToken() tự lấy token mới
- */
-
-import axios, {
-  AxiosError,
-  InternalAxiosRequestConfig,
-} from "axios"
+import axios, { AxiosError, InternalAxiosRequestConfig } from "axios"
 import { getCurrentIdToken } from "@/lib/auth/firebase"
+import {
+  clearStoredAccessToken,
+  getStoredAccessToken,
+  setStoredAccessToken,
+} from "./authToken"
 
-// Mock mode: dùng local Next.js API routes thay vì backend thật
-// Khi cần kết nối backend, set NEXT_PUBLIC_USE_MOCK=false
-const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== "false"
-
-const BASE_URL = USE_MOCK
-  ? "" // Dùng relative URL → Next.js sẽ proxy đến /api/... local
-  : process.env.NEXT_PUBLIC_API_URL ?? "/api/v1"
+const BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1"
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
   headers: { "Content-Type": "application/json" },
-  timeout: 60_000,  // Cloud Run cold start có thể chậm hơn local
+  timeout: 60_000,
 })
 
-// ── Request interceptor: đính Firebase ID Token ───────────────────────────────
+interface RetryableRequestConfig extends InternalAxiosRequestConfig {
+  _retry?: boolean
+}
+
+async function getDevAccessToken(): Promise<string | null> {
+  if (typeof window === "undefined") return null
+  const { data } = await axios.post(`${BASE_URL}/auth/login`, {
+    username: "admin",
+    password: "admin123",
+  })
+  const token = data?.access_token as string | undefined
+  if (token) setStoredAccessToken(token, data?.expires_in)
+  return token ?? null
+}
+
 apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
-  const token = await getCurrentIdToken()
+  let token = getStoredAccessToken() || await getCurrentIdToken()
+  if (!token) token = await getDevAccessToken()
+
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`
   }
   return config
 })
 
-// ── Response interceptor: xử lý 401 ─────────────────────────────────────────
 apiClient.interceptors.response.use(
   (res) => res,
   async (error: AxiosError) => {
-    if (error.response?.status === 401) {
-      // Firebase token hết hạn hoặc bị revoke
-      // Redirect về login để user đăng nhập lại
-      if (typeof window !== "undefined") {
-        window.location.href = "/login"
+    const originalRequest = error.config as RetryableRequestConfig | undefined
+
+    if (
+      error.response?.status === 401 &&
+      typeof window !== "undefined" &&
+      originalRequest &&
+      !originalRequest._retry
+    ) {
+      originalRequest._retry = true
+      clearStoredAccessToken()
+      const token = await getDevAccessToken()
+
+      if (token) {
+        originalRequest.headers.Authorization = `Bearer ${token}`
+        return apiClient(originalRequest)
       }
     }
+
     return Promise.reject(error)
   },
 )

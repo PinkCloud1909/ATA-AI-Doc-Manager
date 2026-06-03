@@ -1,9 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // "standalone" tạo ra bundle tối ưu cho Cloud Run
   output: "standalone",
 
-  // Cho phép next/image phục vụ ảnh từ Google Cloud Storage
   images: {
     remotePatterns: [
       {
@@ -14,17 +12,15 @@ const nextConfig = {
     ],
   },
 
-  // Proxy /api/* → FastAPI backend
   async rewrites() {
     return [
       {
         source: "/api/:path*",
         destination: `${process.env.BACKEND_URL ?? "http://localhost:8000"}/api/:path*`,
       },
-    ];
+    ]
   },
 
-  // Security Headers
   async headers() {
     return [
       {
@@ -46,14 +42,13 @@ const nextConfig = {
           },
         ],
       },
-    ];
+    ]
   },
 
-  // Env vars exposed to browser
   env: {
     NEXT_PUBLIC_GCS_BUCKET_NAME: process.env.GCS_BUCKET_NAME ?? "",
     NEXT_PUBLIC_GCP_PROJECT_ID: process.env.GCP_PROJECT_ID ?? "",
   },
-};
+}
 
-export default nextConfig;
+export default nextConfig

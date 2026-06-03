@@ -15,7 +15,7 @@ export default function ProfileForm() {
   // Cập nhật state khi user data đã được load
   useEffect(() => {
     if (user) {
-      setFullName(user.displayName || "");
+      setFullName(user.username || user.email || "");
       // Giả sử obj user có trường phoneNumber, nếu không bạn có thể thêm vào backend
       setPhoneNumber((user as any).phoneNumber || "");
     }
