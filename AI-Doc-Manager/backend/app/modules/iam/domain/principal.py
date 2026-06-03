@@ -11,3 +11,6 @@ class AuthenticatedUser:
 
     def has_permission(self, permission_key: str) -> bool:
         return permission_key in self.permissions
+
+    def has_role(self, role_name: str) -> bool:
+        return role_name in self.roles

@@ -26,6 +26,7 @@ from app.modules.documents.application.services import (
     create_document,
     create_new_version,
     delete_document_permanently,
+    expire_document,
     get_document_detail,
     list_documents,
     list_pending_approvals,
@@ -40,6 +41,7 @@ from app.shared.adapters.factory import (
 )
 from app.shared.interfaces import ILLMProvider, IObjectStorage, IVectorStore
 from app.modules.iam.domain.principal import AuthenticatedUser
+from app.modules.iam.domain.permissions import get_allowed_statuses
 from app.shared.enums import DocumentType, Status
 
 logger = logging.getLogger(__name__)
@@ -205,6 +207,7 @@ def list_documents_route(
     if page_size > 100:
         page_size = 100
 
+    allowed = get_allowed_statuses(current_user.roles)
     documents, total = list_documents(
         session,
         page=page,
@@ -212,6 +215,7 @@ def list_documents_route(
         status_filter=status_filter,
         document_type_filter=document_type,
         created_by_filter=created_by,
+        allowed_statuses=allowed if allowed else None,
     )
     return DocumentListResponse(
         items=[
@@ -473,6 +477,24 @@ def reject_document_route(
         document_id=document_id,
         user_id=current_user.id,
         reason=payload.reason,
+    )
+    return _build_action_response(document)
+
+
+@documents_router.post(
+    "/{document_id}/expire",
+    response_model=DocumentActionResponse,
+    status_code=status.HTTP_200_OK,
+)
+def expire_document_route(
+    document_id: UUID,
+    current_user: Annotated[AuthenticatedUser, Depends(require_permission())],
+    session: Annotated[Session, Depends(get_db_session)],
+) -> DocumentActionResponse:
+    document = expire_document(
+        session,
+        document_id=document_id,
+        user_id=current_user.id,
     )
     return _build_action_response(document)
 

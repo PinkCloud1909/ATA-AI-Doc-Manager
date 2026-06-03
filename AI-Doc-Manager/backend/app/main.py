@@ -13,6 +13,7 @@ from app.core.exceptions import register_exception_handlers
 from app.core.logging import clear_request_id, configure_logging, set_request_id
 from app.modules.documents.api.router import approvals_router, documents_router
 from app.modules.iam.api.router import router as auth_router
+from app.modules.iam.api.admin_router import admin_router
 from app.modules.qa.api.router import router as qa_router
 from app.modules.reviews.api.router import router as reviews_router
 from app.modules.vectorization.api.router import router as vectorization_router
@@ -49,6 +50,7 @@ app.add_middleware(
 
 register_exception_handlers(app)
 app.include_router(auth_router)
+app.include_router(admin_router)
 app.include_router(documents_router)
 app.include_router(approvals_router)
 app.include_router(reviews_router)

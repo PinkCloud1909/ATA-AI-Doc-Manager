@@ -74,11 +74,20 @@ def list_documents(
     status_filter: Status | None = None,
     document_type_filter: DocumentType | None = None,
     created_by_filter: UUID | None = None,
+    allowed_statuses: set[Status] | None = None,
 ) -> tuple[list[Document], int]:
     query = select(Document)
     count_query = select(func.count()).select_from(Document)
 
+    # Role-based status filtering: restrict to allowed statuses
+    if allowed_statuses is not None:
+        query = query.where(Document.status.in_(allowed_statuses))
+        count_query = count_query.where(Document.status.in_(allowed_statuses))
+
     if status_filter is not None:
+        # If user-supplied filter conflicts with allowed statuses, return empty
+        if allowed_statuses and status_filter not in allowed_statuses:
+            return [], 0
         query = query.where(Document.status == status_filter)
         count_query = count_query.where(Document.status == status_filter)
     if document_type_filter is not None:
@@ -315,3 +324,22 @@ def list_pending_approvals(session: Session) -> list[Document]:
         .scalars()
         .all()
     )
+
+
+def expire_document(
+    session: Session,
+    document_id: UUID,
+    user_id: UUID,
+) -> Document:
+    """Mark an approved document as expired."""
+    document = get_document_by_id(session, document_id)
+    if document.status != Status.APPROVED:
+        raise ConflictError("Only approved documents can be marked as expired")
+
+    now = utcnow()
+    document.status = Status.EXPIRED
+    document.modified_by = user_id
+    document.modified_date = now
+    session.commit()
+    logger.info("document_expired", extra={"document_id": str(document_id)})
+    return document

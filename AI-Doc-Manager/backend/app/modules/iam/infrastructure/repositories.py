@@ -47,3 +47,47 @@ def get_privilege_by_role_and_endpoint(
         Privilege.api_endpoint == api_endpoint,
     )
     return session.execute(stmt).scalar_one_or_none()
+
+
+def list_users(
+    session: Session,
+    *,
+    page: int = 1,
+    page_size: int = 50,
+) -> tuple[list[User], int]:
+    """Return a paginated list of users with their roles eagerly loaded."""
+    from sqlalchemy import func
+
+    total = session.execute(select(func.count()).select_from(User)).scalar() or 0
+    offset = (page - 1) * page_size
+    stmt = (
+        select(User)
+        .options(
+            joinedload(User.user_roles)
+            .joinedload(UserRole.role)
+        )
+        .order_by(User.username)
+        .offset(offset)
+        .limit(page_size)
+    )
+    users = session.execute(stmt).unique().scalars().all()
+    return users, total
+
+
+def get_user_role(
+    session: Session,
+    user_id: UUID,
+    role_id: UUID,
+) -> UserRole | None:
+    """Check if a user-role assignment already exists."""
+    stmt = select(UserRole).where(
+        UserRole.user_id == user_id,
+        UserRole.role_id == role_id,
+    )
+    return session.execute(stmt).scalar_one_or_none()
+
+
+def list_roles(session: Session) -> list[Role]:
+    """Return all roles ordered by name."""
+    stmt = select(Role).order_by(Role.role_name)
+    return session.execute(stmt).scalars().all()
