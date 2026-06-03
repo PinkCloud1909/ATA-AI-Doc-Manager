@@ -1,3 +1,4 @@
+import io
 import logging
 from typing import Annotated
 from uuid import UUID
@@ -79,6 +80,33 @@ def _build_action_response(document) -> DocumentActionResponse:
     )
 
 
+def _read_upload_chunked(
+    file: UploadFile,
+    max_bytes: int,
+) -> tuple[io.BytesIO, int]:
+    """Read an uploaded file in 64 KB chunks, enforcing the size limit early.
+
+    Raises ``ValidationError`` as soon as the accumulated bytes exceed
+    *max_bytes*, without reading the remainder of the stream.  Returns a
+    ``BytesIO`` seeked to position 0 ready for upload, and the exact byte count.
+    """
+    _CHUNK = 64 * 1024  # 64 KB per read
+    chunks: list[bytes] = []
+    total = 0
+    max_mb = max_bytes // (1024 * 1024)
+    while True:
+        chunk = file.file.read(_CHUNK)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise ValidationError(
+                f"File size exceeds maximum of {max_mb} MB"
+            )
+        chunks.append(chunk)
+    return io.BytesIO(b"".join(chunks)), total
+
+
 def _background_vectorize(document_id: UUID) -> None:
     """Background task: run vectorization pipeline for an approved document.
 
@@ -137,15 +165,7 @@ def upload_document(
     settings = get_settings()
     max_bytes = settings.max_upload_size_mb * 1024 * 1024
 
-    # Read file content once for size check; seek back for upload.
-    # For production with very large files, consider streaming chunk-by-chunk.
-    file_content = file.file.read()
-    file_size = len(file_content)
-    if file_size > max_bytes:
-        raise ValidationError(
-            f"File size exceeds maximum of {settings.max_upload_size_mb}MB"
-        )
-    file.file.seek(0)
+    file_buf, file_size = _read_upload_chunked(file, max_bytes)
 
     original_filename = file.filename or "upload"
     resolved_title = title or original_filename
@@ -153,7 +173,7 @@ def upload_document(
     object_key = storage.build_object_key(original_filename)
     storage.ensure_bucket()
     file_link = storage.upload_fileobj(
-        file_obj=file.file,
+        file_obj=file_buf,
         object_key=object_key,
         content_type=file.content_type,
         length=file_size,
@@ -365,19 +385,13 @@ def new_version_document(
     settings = get_settings()
     max_bytes = settings.max_upload_size_mb * 1024 * 1024
 
-    file_content = file.file.read()
-    file_size = len(file_content)
-    if file_size > max_bytes:
-        raise ValidationError(
-            f"File size exceeds maximum of {settings.max_upload_size_mb}MB"
-        )
-    file.file.seek(0)
+    file_buf, file_size = _read_upload_chunked(file, max_bytes)
 
     original_filename = file.filename or "upload"
     object_key = storage.build_object_key(original_filename)
     storage.ensure_bucket()
     file_link = storage.upload_fileobj(
-        file_obj=file.file,
+        file_obj=file_buf,
         object_key=object_key,
         content_type=file.content_type,
         length=file_size,

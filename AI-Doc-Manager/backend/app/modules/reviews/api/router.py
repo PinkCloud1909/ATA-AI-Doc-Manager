@@ -1,13 +1,13 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db_session
 from app.core.dependencies import require_permission
 from app.modules.iam.domain.principal import AuthenticatedUser
-from app.modules.reviews.api.schemas import ReviewCreateRequest, ReviewResponse
+from app.modules.reviews.api.schemas import ReviewCreateRequest, ReviewListResponse, ReviewResponse
 from app.modules.reviews.application.services import create_review, list_reviews
 
 router = APIRouter(prefix="/api/v1/documents", tags=["reviews"])
@@ -43,23 +43,36 @@ def add_review(
 
 @router.get(
     "/{document_id}/reviews",
-    response_model=list[ReviewResponse],
+    response_model=ReviewListResponse,
     status_code=status.HTTP_200_OK,
 )
 def get_reviews(
     document_id: UUID,
     current_user: Annotated[AuthenticatedUser, Depends(require_permission())],
     session: Annotated[Session, Depends(get_db_session)],
-) -> list[ReviewResponse]:
-    reviews = list_reviews(session, document_id=document_id)
-    return [
-        ReviewResponse(
-            id=review.id,
-            document_id=review.document_id,
-            user_id=review.user_id,
-            grade=review.grade,
-            comment=review.comment,
-            created_date=review.created_date,
-        )
-        for review in reviews
-    ]
+    page: int = Query(default=1, ge=1, description="Page number (1-based)"),
+    page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
+) -> ReviewListResponse:
+    reviews, total = list_reviews(
+        session,
+        document_id=document_id,
+        page=page,
+        page_size=page_size,
+    )
+    return ReviewListResponse(
+        items=[
+            ReviewResponse(
+                id=review.id,
+                document_id=review.document_id,
+                user_id=review.user_id,
+                grade=review.grade,
+                comment=review.comment,
+                created_date=review.created_date,
+            )
+            for review in reviews
+        ],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
+

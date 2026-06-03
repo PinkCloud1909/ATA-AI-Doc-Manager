@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import ConflictError, ValidationError
@@ -38,14 +38,37 @@ def create_review(
     return review
 
 
-def list_reviews(session: Session, document_id: UUID) -> list[DocumentReview]:
+def list_reviews(
+    session: Session,
+    document_id: UUID,
+    *,
+    page: int = 1,
+    page_size: int = 20,
+) -> tuple[list[DocumentReview], int]:
+    """Return a paginated list of reviews for a document, newest first."""
     get_document_by_id(session, document_id)
-    return (
+
+    total = (
+        session.execute(
+            select(func.count())
+            .select_from(DocumentReview)
+            .where(DocumentReview.document_id == document_id)
+        ).scalar()
+        or 0
+    )
+
+    offset = (page - 1) * page_size
+    reviews = (
         session.execute(
             select(DocumentReview)
             .where(DocumentReview.document_id == document_id)
             .order_by(DocumentReview.created_date.desc())
+            .offset(offset)
+            .limit(page_size)
         )
         .scalars()
         .all()
     )
+
+    return list(reviews), total
+

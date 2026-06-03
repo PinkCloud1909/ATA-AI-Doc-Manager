@@ -16,3 +16,10 @@ class ReviewResponse(BaseModel):
     grade: int
     comment: str
     created_date: datetime | None = None
+
+
+class ReviewListResponse(BaseModel):
+    items: list[ReviewResponse]
+    total: int
+    page: int
+    page_size: int

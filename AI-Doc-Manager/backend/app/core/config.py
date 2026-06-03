@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,6 +29,13 @@ class Settings(BaseSettings):
     jwt_secret_key: str = "change-me"
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 60
+
+    # CORS: set via env var as a comma-separated string.
+    # Example: CORS_ALLOWED_ORIGINS=http://localhost:3000,https://app.example.com
+    # In production, restrict this to your specific frontend domain(s).
+    cors_allowed_origins: list[str] = Field(
+        default=["http://localhost:3000", "http://localhost:8000"]
+    )
 
     minio_endpoint: str = "localhost:9000"
     minio_external_endpoint: str | None = None
@@ -66,6 +73,27 @@ class Settings(BaseSettings):
     vertex_index_id: str | None = None
     vertex_index_endpoint_id: str | None = None
     vertex_deployed_index_id: str | None = None
+
+    @field_validator("cors_allowed_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v: object) -> list[str]:
+        """Accept a comma-separated string or a JSON list from the environment."""
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
+
+    @model_validator(mode="after")
+    def validate_production_settings(self) -> "Settings":
+        """Enforce strong JWT secret in production to prevent auth compromise."""
+        _WEAK_DEFAULTS = {"change-me", "change-me-in-real-environments", ""}
+        if self.environment.lower() in {"production", "prod"}:
+            if self.jwt_secret_key in _WEAK_DEFAULTS or len(self.jwt_secret_key) < 32:
+                raise ValueError(
+                    "JWT_SECRET_KEY must be a strong, unique secret of at least 32 characters "
+                    "when ENVIRONMENT=production. "
+                    "Set the JWT_SECRET_KEY environment variable to a secure random string."
+                )
+        return self
 
     @property
     def google_ai_api_key(self) -> str | None:

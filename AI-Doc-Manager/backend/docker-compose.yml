@@ -12,6 +12,10 @@ services:
       MINIO_EXTERNAL_ENDPOINT: ${MINIO_EXTERNAL_ENDPOINT:-localhost:9000}
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      # ChromaDB persistence path — must match the volume mount below.
+      CHROMA_PERSIST_PATH: /app/.chroma_data
+    volumes:
+      - chroma_data:/app/.chroma_data
     depends_on:
       postgres:
         condition: service_healthy
@@ -71,3 +75,5 @@ services:
 volumes:
   postgres_data:
   minio_data:
+  # Named volume for ChromaDB vector store — prevents data loss on container restart.
+  chroma_data:
