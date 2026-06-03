@@ -43,6 +43,11 @@ class ValidationError(AppError):
     code = "validation_error"
 
 
+class ExternalServiceError(AppError):
+    status_code = 502
+    code = "external_service_error"
+
+
 def _build_error_response(status_code: int, code: str, detail: str) -> JSONResponse:
     return JSONResponse(
         status_code=status_code,

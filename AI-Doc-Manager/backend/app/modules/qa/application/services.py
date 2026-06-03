@@ -13,6 +13,7 @@ from google.adk.sessions import DatabaseSessionService
 from google.genai import types
 
 from app.core.config import get_settings
+from app.core.exceptions import ExternalServiceError
 from app.modules.qa.domain.agent import root_agent
 
 logger = logging.getLogger(__name__)
@@ -83,10 +84,28 @@ class ChatService:
             ):
                 events.append(event)
         except Exception as exc:
+            error_message = str(exc)
             logger.error(
                 "chat_runner_error",
-                extra={"session_id": session_id, "error": str(exc)},
+                extra={"session_id": session_id, "error": error_message},
             )
+
+            if (
+                "API_KEY_SERVICE_BLOCKED" in error_message
+                or "PERMISSION_DENIED" in error_message
+                or "generativelanguage.googleapis.com" in error_message
+            ):
+                raise ExternalServiceError(
+                    "Gemini API key is blocked for Generative Language API. "
+                    "Enable generativelanguage.googleapis.com for this key/project, "
+                    "or configure a valid server-side GOOGLE_API_KEY."
+                ) from exc
+
+            if "Connection refused" in error_message:
+                raise ExternalServiceError(
+                    "Chat session database is unreachable. Check ASYNC_DATABASE_URL."
+                ) from exc
+
             raise
 
         # Extract the last model text from the event stream
