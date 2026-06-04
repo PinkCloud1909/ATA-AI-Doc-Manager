@@ -72,11 +72,22 @@ class ChromaVectorAdapter(IVectorStore):
         )
 
     def semantic_search(
-        self, query_embedding: list[float], top_k: int = 5
+        self,
+        query_embedding: list[float],
+        top_k: int = 5,
+        filter_document_ids: list[str] | None = None,
     ) -> list[dict[str, Any]]:
+        where_clause = None
+        if filter_document_ids:
+            if len(filter_document_ids) == 1:
+                where_clause = {"document_id": filter_document_ids[0]}
+            else:
+                where_clause = {"document_id": {"$in": filter_document_ids}}
+
         results = self.collection.query(
             query_embeddings=[query_embedding],
             n_results=top_k,
+            where=where_clause,
             include=["documents", "metadatas", "distances"],
         )
 

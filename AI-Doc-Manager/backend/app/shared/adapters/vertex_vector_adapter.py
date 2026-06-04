@@ -53,7 +53,12 @@ class VertexVectorAdapter(IVectorStore):
         # This is a common pattern: Vector DB returns ID, then you fetch the text from Postgres/GCS.
         # Alternatively, Vertex Vector Search now supports storing small amounts of string data via `crowding_tag` or custom names.
 
-    def semantic_search(self, query_embedding: list[float], top_k: int = 5) -> list[dict[str, Any]]:
+    def semantic_search(
+        self,
+        query_embedding: list[float],
+        top_k: int = 5,
+        filter_document_ids: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         if not self.index_endpoint_id:
             return []
 

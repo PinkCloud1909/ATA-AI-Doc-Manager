@@ -49,7 +49,12 @@ class IVectorStore(ABC):
         pass
 
     @abstractmethod
-    def semantic_search(self, query_embedding: list[float], top_k: int = 5) -> list[dict[str, Any]]:
+    def semantic_search(
+        self,
+        query_embedding: list[float],
+        top_k: int = 5,
+        filter_document_ids: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         pass
 
     @abstractmethod
