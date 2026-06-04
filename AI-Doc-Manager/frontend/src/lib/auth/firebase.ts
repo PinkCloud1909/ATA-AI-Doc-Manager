@@ -69,7 +69,8 @@ export async function getCurrentIdToken(): Promise<string | null> {
 }
 
 export async function signOut(): Promise<void> {
-  if (firebaseAuth && firebaseAuth.signOut) {
+  const authLike = firebaseAuth as { signOut?: unknown }
+  if (typeof authLike.signOut === "function") {
     await firebaseSignOut(firebaseAuth)
   }
 }
@@ -79,7 +80,8 @@ export async function signOut(): Promise<void> {
  * Dùng trong Providers để cập nhật store khi token mới được issue.
  */
 export function onTokenRefresh(callback: (user: User | null) => void) {
-  if (!firebaseAuth || !firebaseAuth.onIdTokenChanged) {
+  const authLike = firebaseAuth as { onIdTokenChanged?: unknown }
+  if (typeof authLike.onIdTokenChanged !== "function") {
     return () => {} // Trả về hàm rỗng nếu đang mock/build
   }
   return onIdTokenChanged(firebaseAuth, callback)

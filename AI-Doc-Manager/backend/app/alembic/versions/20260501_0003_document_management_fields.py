@@ -39,34 +39,24 @@ def upgrade() -> None:
         "documents",
         sa.Column("content_type", sa.String(length=200), nullable=True),
     )
-<<<<<<< HEAD
     op.add_column(
         "documents",
         sa.Column("vertex_index_id", sa.String(length=255), nullable=True),
     )
 
-=======
-
     # Backfill title and original_filename for any existing rows
->>>>>>> test-fe2
     op.execute("UPDATE documents SET title = 'Untitled' WHERE title IS NULL")
     op.execute(
         "UPDATE documents SET original_filename = 'unknown' WHERE original_filename IS NULL"
     )
 
-<<<<<<< HEAD
-=======
     # Make title and original_filename NOT NULL after backfill
->>>>>>> test-fe2
     op.alter_column("documents", "title", nullable=False)
     op.alter_column("documents", "original_filename", nullable=False)
 
 
 def downgrade() -> None:
-<<<<<<< HEAD
     op.drop_column("documents", "vertex_index_id")
-=======
->>>>>>> test-fe2
     op.drop_column("documents", "content_type")
     op.drop_column("documents", "file_size")
     op.drop_column("documents", "original_filename")

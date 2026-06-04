@@ -41,32 +41,41 @@ export default function ApprovalsPage() {
           </div>
         ) : (
           <ul className="divide-y divide-slate-100">
-            {queue.map((doc) => (
-              <li
-                key={doc.id}
-                className="flex items-center justify-between px-5 py-4 gap-4 hover:bg-slate-50 transition-colors min-w-0"
-              >
-                <div className="min-w-0 flex-1">
-                  <Link
-                    href={`/documents/${doc.id}`}
-                    className="font-medium text-slate-800 hover:text-blue-600 text-sm truncate block"
-                  >
-                    {doc.file_link.split("/").pop()}
-                  </Link>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    v{doc.version} · {doc.created_by_name} ·{" "}
-                    {new Date(doc.created_at).toLocaleDateString("vi-VN")}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <StatusBadge status={doc.status} />
-                  <ApprovalActions
-                    documentId={doc.id}
-                    onDone={() => refetch()}
-                  />
-                </div>
-              </li>
-            ))}
+            {queue.map((doc) => {
+              const documentId = doc.id ?? doc.document_id ?? doc.document_group_id;
+              const fileName =
+                doc.original_filename ||
+                doc.title ||
+                doc.file_link?.split("/").pop() ||
+                "Tài liệu chưa đặt tên";
+
+              return (
+                <li
+                  key={documentId}
+                  className="flex items-center justify-between px-5 py-4 gap-4 hover:bg-slate-50 transition-colors min-w-0"
+                >
+                  <div className="min-w-0 flex-1">
+                    <Link
+                      href={`/documents/${documentId}`}
+                      className="font-medium text-slate-800 hover:text-blue-600 text-sm truncate block"
+                    >
+                      {fileName}
+                    </Link>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      v{doc.version} · {doc.created_by_name ?? "Không rõ người tạo"} ·{" "}
+                      {new Date(doc.created_at).toLocaleDateString("vi-VN")}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <StatusBadge status={doc.status} />
+                    <ApprovalActions
+                      documentId={documentId}
+                      onDone={() => refetch()}
+                    />
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
