@@ -1,27 +1,43 @@
 {
-  "name": "ai-doc-manager-frontend",
+  "name": "runbook-platform-frontend",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0 --port 3000",
     "build": "next build",
     "start": "next start --hostname 0.0.0.0 --port 3000",
+    "lint": "next lint",
+    "test": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.100.1",
+    "axios": "^1.7.2",
+    "clsx": "^2.1.1",
+    "firebase": "^10.14.1",
     "lucide-react": "^0.395.0",
     "next": "^16.2.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-markdown": "^9.0.1",
+    "sonner": "^1.7.4",
+    "tailwind-merge": "^2.3.0",
+    "uuid": "^10.0.0",
     "zustand": "^4.5.7"
   },
   "devDependencies": {
+    "@tailwindcss/container-queries": "^0.1.1",
+    "@tailwindcss/forms": "^0.5.11",
     "@types/node": "^20.19.0",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
+    "@types/uuid": "^10.0.0",
     "autoprefixer": "^10.4.21",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.2.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.19",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^1.6.0"
   }
 }

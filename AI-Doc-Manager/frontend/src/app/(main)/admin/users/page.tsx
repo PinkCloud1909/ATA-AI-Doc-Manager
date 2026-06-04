@@ -1,7 +1,7 @@
 const users = [
   ["admin", "Administrator", "Active"],
   ["qa.manager", "QA Manager", "Active"],
-  ["ops.reviewer", "Operations Reviewer", "Invited"]
+  ["ops.reviewer", "Operations Reviewer", "Invited"],
 ];
 
 export default function UsersPage() {

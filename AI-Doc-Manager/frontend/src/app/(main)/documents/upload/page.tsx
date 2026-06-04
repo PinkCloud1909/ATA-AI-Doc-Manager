@@ -1,37 +1,17 @@
-export default function UploadDocumentPage() {
-  return (
-    <>
-      <section className="page-header">
-        <div>
-          <h2>Upload Document</h2>
-          <p>Add a controlled document package for review and indexing.</p>
-        </div>
-      </section>
+import UploadForm from "@/components/documents/UploadForm";
 
-      <section className="panel">
-        <form className="form">
-          <div className="field">
-            <label htmlFor="title">Document title</label>
-            <input id="title" name="title" placeholder="Incoming material inspection" />
-          </div>
-          <div className="field">
-            <label htmlFor="owner">Owner</label>
-            <select id="owner" name="owner" defaultValue="quality">
-              <option value="quality">Quality</option>
-              <option value="operations">Operations</option>
-              <option value="maintenance">Maintenance</option>
-              <option value="compliance">Compliance</option>
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="file">File</label>
-            <input id="file" name="file" type="file" />
-          </div>
-          <button className="button" type="button">
-            Queue upload
-          </button>
-        </form>
-      </section>
-    </>
+export default function UploadPage() {
+  return (
+    <div className="space-y-6 max-w-2xl">
+      <div>
+        <h1 className="text-2xl font-bold text-slate-800">Upload tài liệu</h1>
+        <p className="text-sm text-slate-500 mt-0.5">
+          Tải lên tài liệu mới hoặc phiên bản mới của tài liệu hiện có
+        </p>
+      </div>
+      <div className="bg-white rounded-xl border border-slate-200 p-6">
+        {/* <UploadForm /> */}
+      </div>
+    </div>
   );
 }

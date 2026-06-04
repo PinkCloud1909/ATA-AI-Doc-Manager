@@ -16,6 +16,8 @@ def _create_document(db_session, *, group_id, version, status, created_by):
         version=version,
         document_type=DocumentType.POLICY,
         status=status,
+        title="Test Document",
+        original_filename="sample.pdf",
         file_link="minio://documents/sample.pdf",
         created_by=created_by,
         created_at=utcnow(),

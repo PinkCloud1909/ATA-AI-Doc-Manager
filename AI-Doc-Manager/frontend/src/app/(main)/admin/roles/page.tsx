@@ -2,7 +2,7 @@ const roles = [
   ["Administrator", "Full platform access"],
   ["QA Manager", "Approve and return controlled documents"],
   ["Reviewer", "Review assigned documents and add comments"],
-  ["Viewer", "Read approved documents"]
+  ["Viewer", "Read approved documents"],
 ];
 
 export default function RolesPage() {

@@ -1,7 +1,11 @@
 node_modules
-.next
+tsconfig.tsbuildinfo
 npm-debug.log
 Dockerfile
 .dockerignore
+.next
+out
+build
+dist
+.git
 .env*.local
-tsconfig.tsbuildinfo

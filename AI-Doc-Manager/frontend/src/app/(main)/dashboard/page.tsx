@@ -1,67 +1,35 @@
-const documents = [
-  ["SOP-1004", "Incoming material inspection", "Ready"],
-  ["WI-2210", "Calibration workflow", "Review"],
-  ["FRM-0188", "Deviation intake form", "Ready"]
-];
+"use client";
+
+import SummaryCards from "@/components/reports/SummaryCards";
+import StatusChart from "@/components/reports/StatusChart";
+import ActivityTable from "@/components/reports/ActivityTable";
+// Import AiCuratorCard nếu bạn có component này
+import AiCuratorCard from "@/components/reports/AiCuratorCard";
 
 export default function DashboardPage() {
   return (
-    <>
-      <section className="page-header">
-        <div>
-          <h2>Dashboard</h2>
-          <p>Current operational status for controlled documents.</p>
-        </div>
-        <div className="toolbar">
-          <a className="button" href="/documents/upload">
-            Upload document
-          </a>
-          <a className="button secondary" href="/reports">
-            View reports
-          </a>
-        </div>
-      </section>
+    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8 min-w-0">
+      {/* Header Dashboard */}
+      <div>
+        <h1 className="text-3xl font-extrabold text-on-surface tracking-tight">
+          Dashboard
+        </h1>
+        <p className="text-sm text-on-surface-variant mt-1">
+          Tổng quan hệ thống quản lý tài liệu tri thức
+        </p>
+      </div>
 
-      <section className="grid grid-3">
-        <div className="panel metric">
-          <span>Indexed documents</span>
-          <strong>128</strong>
-        </div>
-        <div className="panel metric">
-          <span>Pending approvals</span>
-          <strong>7</strong>
-        </div>
-        <div className="panel metric">
-          <span>Review cycle time</span>
-          <strong>2.4d</strong>
-        </div>
-      </section>
+      {/* Khối Pie Chart và Thống kê nhanh */}
+      <SummaryCards />
 
-      <section className="panel" style={{ marginTop: 16 }}>
-        <h3>Recent documents</h3>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Code</th>
-              <th>Title</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {documents.map(([code, title, status]) => (
-              <tr key={code}>
-                <td>{code}</td>
-                <td>{title}</td>
-                <td>
-                  <span className={`status ${status === "Review" ? "review" : "ready"}`}>
-                    {status}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-    </>
+      {/* Khối Biểu đồ cột */}
+      <StatusChart />
+
+      {/* Khối Hoạt động & AI Insights ở dưới cùng */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <ActivityTable />
+        <AiCuratorCard />
+      </div>
+    </div>
   );
 }
