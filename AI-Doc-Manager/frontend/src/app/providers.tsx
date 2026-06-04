@@ -8,6 +8,21 @@ import { onTokenRefresh } from "@/lib/auth/firebase"
 import { authApi } from "@/lib/api/auth"
 import { useAuthStore } from "@/stores/authStore"
 
+const ENABLE_FIREBASE_SYNC =
+  process.env.NEXT_PUBLIC_USE_MOCK === "false" &&
+  Boolean(process.env.NEXT_PUBLIC_FIREBASE_API_KEY)
+
+function ClientOnlyToaster() {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) return null
+  return <Toaster richColors position="top-right" />
+}
+
 function FirebaseSessionSync() {
   const setUser = useAuthStore((s) => s.setUser)
   const logout  = useAuthStore((s) => s.logout)
@@ -55,9 +70,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <FirebaseSessionSync />
+      {ENABLE_FIREBASE_SYNC && <FirebaseSessionSync />}
       {children}
-      <Toaster richColors position="top-right" />
+      <ClientOnlyToaster />
     </QueryClientProvider>
   )
 }

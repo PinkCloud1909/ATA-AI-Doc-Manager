@@ -1,4 +1,5 @@
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
@@ -6,6 +7,8 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db_session
 from app.core.dependencies import require_permission
 from app.modules.iam.api.schemas import (
+    AdminUserCreateRequest,
+    AssignRolesRequest,
     LoginRequest,
     MeResponse,
     PrivilegeResponse,
@@ -14,12 +17,20 @@ from app.modules.iam.api.schemas import (
     TokenResponse,
     UserRoleResponse,
 )
-from app.modules.iam.application.services import issue_access_token, register_user
+from app.modules.iam.application.services import (
+    assign_roles_to_user,
+    create_user,
+    issue_access_token,
+    list_roles,
+    list_users,
+    register_user,
+)
 from app.modules.iam.infrastructure.repositories import get_user_by_id
 from app.modules.iam.domain.principal import AuthenticatedUser
 from app.shared.utils import utcnow
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+admin_router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
 
 def _build_me_response(user) -> MeResponse:
@@ -59,6 +70,23 @@ def _build_me_response(user) -> MeResponse:
         email=user.email,
         last_password_changed=user.last_password_changed,
         roles=roles,
+    )
+
+
+def _build_role_response(role) -> RoleResponse:
+    return RoleResponse(
+        id=role.id,
+        role_name=role.role_name,
+        description=role.description,
+        privileges=[
+            PrivilegeResponse(
+                id=privilege.id,
+                role_id=privilege.role_id,
+                api_endpoint=privilege.api_endpoint,
+                is_allowed=privilege.is_allowed,
+            )
+            for privilege in role.privileges
+        ],
     )
 
 
@@ -134,3 +162,55 @@ def password_changed(
     user.last_password_changed = utcnow()
     session.commit()
     return {"status": "ok"}
+
+
+@admin_router.get("/roles", response_model=list[RoleResponse], status_code=status.HTTP_200_OK)
+def admin_list_roles(
+    current_user: Annotated[AuthenticatedUser, Depends(require_permission())],
+    session: Annotated[Session, Depends(get_db_session)],
+) -> list[RoleResponse]:
+    return [_build_role_response(role) for role in list_roles(session)]
+
+
+@admin_router.get("/users", response_model=list[MeResponse], status_code=status.HTTP_200_OK)
+def admin_list_users(
+    current_user: Annotated[AuthenticatedUser, Depends(require_permission())],
+    session: Annotated[Session, Depends(get_db_session)],
+) -> list[MeResponse]:
+    return [_build_me_response(user) for user in list_users(session)]
+
+
+@admin_router.post("/users", response_model=MeResponse, status_code=status.HTTP_201_CREATED)
+def admin_create_user(
+    payload: AdminUserCreateRequest,
+    current_user: Annotated[AuthenticatedUser, Depends(require_permission())],
+    session: Annotated[Session, Depends(get_db_session)],
+) -> MeResponse:
+    user = create_user(
+        session,
+        username=payload.username,
+        password=payload.password,
+        role_names=payload.role_names,
+        created_by=current_user.id,
+    )
+    return _build_me_response(user)
+
+
+@admin_router.put(
+    "/users/{user_id}/roles",
+    response_model=MeResponse,
+    status_code=status.HTTP_200_OK,
+)
+def admin_assign_roles(
+    user_id: UUID,
+    payload: AssignRolesRequest,
+    current_user: Annotated[AuthenticatedUser, Depends(require_permission())],
+    session: Annotated[Session, Depends(get_db_session)],
+) -> MeResponse:
+    user = assign_roles_to_user(
+        session,
+        user_id=user_id,
+        role_names=payload.role_names,
+        assigned_by=current_user.id,
+    )
+    return _build_me_response(user)

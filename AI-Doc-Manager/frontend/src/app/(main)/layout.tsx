@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/stores/authStore"
 import Sidebar from "@/components/layout/Sidebar"
@@ -9,12 +9,17 @@ import Header  from "@/components/layout/Header"
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore()
   const router = useRouter()
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    if (!isAuthenticated()) router.replace("/login")
-  }, [isAuthenticated, router])
+    setMounted(true)
+  }, [])
 
-  if (!isAuthenticated()) return null
+  useEffect(() => {
+    if (mounted && !isAuthenticated()) router.replace("/login")
+  }, [isAuthenticated, mounted, router])
+
+  if (!mounted || !isAuthenticated()) return null
 
   return (
     <div className="flex h-[100vh] w-[100vw] overflow-hidden">

@@ -7,13 +7,15 @@ from pathlib import Path
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.db import get_db_session
 from app.core.dependencies import require_permission
+from app.core.exceptions import ForbiddenError
 from app.modules.documents.api.schemas import (
     ApprovalQueueItem,
     ConfirmUploadRequest,
@@ -38,6 +40,7 @@ from app.modules.documents.application.services import (
     get_document_versions,
     list_documents,
     list_pending_approvals,
+    mark_document_expired,
     permanently_delete_document,
     reject_document,
     submit_document_for_review,
@@ -50,6 +53,25 @@ from app.shared.utils import safe_filename, utcnow
 
 documents_router = APIRouter(prefix="/api/v1/documents", tags=["documents"])
 approvals_router = APIRouter(prefix="/api/v1/approvals", tags=["approvals"])
+
+ROLE_VISIBLE_STATUSES: dict[str, set[Status]] = {
+    "user": {Status.APPROVED, Status.EXPIRED},
+    "viewer": {Status.APPROVED, Status.EXPIRED},
+    "editor": {
+        Status.DRAFT,
+        Status.PENDING_REVIEW,
+        Status.APPROVED,
+        Status.REJECTED,
+        Status.EXPIRED,
+    },
+    "reviewer": {
+        Status.PENDING_REVIEW,
+        Status.APPROVED,
+        Status.REJECTED,
+        Status.EXPIRED,
+    },
+}
+ADMIN_ROLES = {"admin"}
 
 
 class LocalStorageAdapter:
@@ -102,12 +124,45 @@ def _get_storage() -> LocalStorageAdapter:
     return LocalStorageAdapter()
 
 
+def _allowed_statuses(current_user: AuthenticatedUser) -> set[Status] | None:
+    role_names = {role_name.lower() for role_name in current_user.roles}
+    if role_names & ADMIN_ROLES:
+        return None
+
+    statuses: set[Status] = set()
+    for role_name in role_names:
+        statuses.update(ROLE_VISIBLE_STATUSES.get(role_name, set()))
+    return statuses
+
+
+def _ensure_can_view_document(
+    current_user: AuthenticatedUser,
+    document: Document,
+) -> None:
+    allowed_statuses = _allowed_statuses(current_user)
+    if allowed_statuses is not None and document.status not in allowed_statuses:
+        raise ForbiddenError("You do not have access to this document")
+
+
 def _download_url(document: Document) -> str:
+    if document.file_link.startswith("local://documents/"):
+        return f"/api/v1/documents/{document.id}/download"
     try:
         value = _get_storage().generate_presigned_download_url(document.file_link)
         return value if isinstance(value, str) else document.file_link
     except Exception:
         return document.file_link
+
+
+def _local_file_path(document: Document) -> Path | None:
+    if not document.file_link.startswith("local://documents/"):
+        return None
+    object_key = document.file_link.removeprefix("local://documents/")
+    root = Path(__file__).resolve().parents[5] / "storage"
+    target = (root / object_key).resolve()
+    if not str(target).startswith(str(root.resolve())):
+        return None
+    return target
 
 
 def _review_payloads(document: Document) -> list[dict[str, Any]]:
@@ -355,6 +410,7 @@ def get_all_documents(
     documents, total = list_documents(
         session,
         status_filter=status_filter or status_param,
+        allowed_statuses=_allowed_statuses(current_user),
         document_type=document_type,
         search=search,
         page=page,
@@ -378,7 +434,9 @@ def get_document_detail(
     current_user: Annotated[AuthenticatedUser, Depends(require_permission())],
     session: Annotated[Session, Depends(get_db_session)],
 ) -> DocumentDetailResponse:
-    return _build_detail_response(get_document_by_id(session, document_id), session)
+    document = get_document_by_id(session, document_id)
+    _ensure_can_view_document(current_user, document)
+    return _build_detail_response(document, session)
 
 
 @documents_router.get(
@@ -392,7 +450,29 @@ def get_download_url(
     session: Annotated[Session, Depends(get_db_session)],
 ) -> dict[str, str]:
     document = get_document_by_id(session, document_id)
+    _ensure_can_view_document(current_user, document)
     return {"download_url": _download_url(document)}
+
+
+@documents_router.get(
+    "/{document_id}/download",
+    status_code=status.HTTP_200_OK,
+)
+def download_document(
+    document_id: UUID,
+    current_user: Annotated[AuthenticatedUser, Depends(require_permission())],
+    session: Annotated[Session, Depends(get_db_session)],
+) -> FileResponse:
+    document = get_document_by_id(session, document_id)
+    _ensure_can_view_document(current_user, document)
+    target = _local_file_path(document)
+    if target is None or not target.exists():
+        raise HTTPException(status_code=404, detail="File not found in local storage")
+    return FileResponse(
+        path=target,
+        filename=document.original_filename,
+        media_type=document.content_type or "application/octet-stream",
+    )
 
 
 @documents_router.get(
@@ -406,7 +486,11 @@ def get_versions(
     session: Annotated[Session, Depends(get_db_session)],
 ) -> list[VersionHistoryItem]:
     document = get_document_by_id(session, document_id)
+    _ensure_can_view_document(current_user, document)
     versions = get_document_versions(session, document.document_group_id)
+    allowed_statuses = _allowed_statuses(current_user)
+    if allowed_statuses is not None:
+        versions = [version for version in versions if version.status in allowed_statuses]
     return [
         VersionHistoryItem(
             id=v.id,
@@ -562,6 +646,24 @@ def reject_document_route(
         document_id=document_id,
         user_id=current_user.id,
         reason=payload.reason,
+    )
+    return _build_document_response(document)
+
+
+@documents_router.post(
+    "/{document_id}/expire",
+    response_model=DocumentActionResponse,
+    status_code=status.HTTP_200_OK,
+)
+def expire_document_route(
+    document_id: UUID,
+    current_user: Annotated[AuthenticatedUser, Depends(require_permission())],
+    session: Annotated[Session, Depends(get_db_session)],
+) -> DocumentActionResponse:
+    document = mark_document_expired(
+        session,
+        document_id=document_id,
+        user_id=current_user.id,
     )
     return _build_document_response(document)
 

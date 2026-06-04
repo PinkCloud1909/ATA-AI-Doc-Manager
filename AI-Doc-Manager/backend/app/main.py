@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -13,7 +14,7 @@ from app.core.exceptions import register_exception_handlers
 from app.core.logging import clear_request_id, configure_logging, set_request_id
 from app.modules.documents.api.router import approvals_router, documents_router
 from app.modules.generate.api.router import router as generate_router
-from app.modules.iam.api.router import router as auth_router
+from app.modules.iam.api.router import admin_router, router as auth_router
 from app.modules.qa.api.router import chat_router, router as qa_router
 from app.modules.reviews.api.router import router as reviews_router, reviews_router as reviews_detail_router
 from app.shared.schemas import HealthResponse, ReadyResponse
@@ -36,8 +37,21 @@ app = FastAPI(
     debug=settings.debug,
     lifespan=lifespan,
 )
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 register_exception_handlers(app)
 app.include_router(auth_router)
+app.include_router(admin_router)
 app.include_router(documents_router)
 app.include_router(approvals_router)
 app.include_router(reviews_router)

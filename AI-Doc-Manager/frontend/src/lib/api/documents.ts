@@ -51,6 +51,13 @@ export const documentsApi = {
     return data.download_url
   },
 
+  downloadFile: async (id: string): Promise<Blob> => {
+    const { data } = await apiClient.get(`/documents/${id}/download`, {
+      responseType: "blob",
+    })
+    return data
+  },
+
   create: async (
     file_link: string,
     document_type: DocumentType,
@@ -165,6 +172,11 @@ export const documentsApi = {
 
   reject: async (id: string, reason: string) => {
     const { data } = await apiClient.post(`/documents/${id}/reject`, { reason })
+    return data
+  },
+
+  expire: async (id: string) => {
+    const { data } = await apiClient.post(`/documents/${id}/expire`)
     return data
   },
 }

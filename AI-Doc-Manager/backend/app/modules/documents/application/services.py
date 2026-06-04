@@ -138,6 +138,7 @@ def list_documents(
     session: Session,
     *,
     status_filter: Status | None = None,
+    allowed_statuses: set[Status] | None = None,
     document_type: DocumentType | None = None,
     search: str | None = None,
     page: int = 1,
@@ -146,6 +147,10 @@ def list_documents(
     stmt = select(Document)
     count_stmt = select(func.count()).select_from(Document)
     filters = []
+    if allowed_statuses is not None:
+        if not allowed_statuses:
+            return [], 0
+        filters.append(Document.status.in_(allowed_statuses))
     if status_filter is not None:
         filters.append(Document.status == status_filter)
     if document_type is not None:
@@ -260,6 +265,21 @@ def reject_document(
     document.rejected_reason = reason
     document.modified_by = user_id
     document.modified_date = now
+    session.commit()
+    session.refresh(document)
+    return document
+
+
+def mark_document_expired(session: Session, document_id: UUID, user_id: UUID) -> Document:
+    document = get_document_by_id(session, document_id)
+    if document.status == Status.EXPIRED:
+        raise ConflictError("Document is already expired")
+    if document.status not in {Status.APPROVED, Status.PENDING_REVIEW, Status.REJECTED}:
+        raise ConflictError("Only approved, pending, or rejected documents can be expired")
+
+    document.status = Status.EXPIRED
+    document.modified_by = user_id
+    document.modified_date = utcnow()
     session.commit()
     session.refresh(document)
     return document

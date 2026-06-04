@@ -1,151 +1,123 @@
-"use client";
-import { useState } from "react";
-import Link from "next/link";
-import { useDocumentList } from "@/hooks/useDocuments";
-//import { DocumentTable } from "@/components/documents/DocumentTable"
-import { DocumentStatus, DocumentType } from "@/types/document";
-import { usePermission } from "@/hooks/usePermission";
+"use client"
 
-import UploadForm from "@/components/documents/UploadForm";
-import DocumentFilters from "@/components/documents/DocumentFilters";
-import DocumentStats from "@/components/documents/DocumentStats";
+import Link from "next/link"
+import { useMemo, useState } from "react"
+import { Plus, Upload } from "lucide-react"
+import { useDocumentList } from "@/hooks/useDocuments"
+import DocumentTable from "@/components/documents/DocumentTable"
+import { DocumentStatus, DocumentType } from "@/types/document"
 
-// Bắt buộc phải có dòng này vì ta dùng useState (Client Component)
-import DocumentTable, {
-  DocumentItem,
-} from "@/components/documents/DocumentTable";
+const STATUS_OPTIONS = [
+  { value: "", label: "Tất cả trạng thái" },
+  { value: DocumentStatus.DRAFT, label: "Draft" },
+  { value: DocumentStatus.PENDING_REVIEW, label: "Pending Review" },
+  { value: DocumentStatus.APPROVED, label: "Approved" },
+  { value: DocumentStatus.REJECTED, label: "Rejected" },
+  { value: DocumentStatus.EXPIRED, label: "Expired" },
+]
 
-// Dữ liệu mẫu (Mock Data) giả lập việc gọi API
-const mockData: DocumentItem[] = [
-  {
-    id: "DOC-2024-001",
-    name: "Incident Response Plan v4",
-    category: "Cyber Security",
-    type: "Runbook",
-    status: "Approved",
-    version: "4.2.1",
-    score: "9.5",
-    updatedAt: "Hôm nay, 14:20",
-    author: "Hoàng Nguyễn",
-    icon: "description",
-    bgColor: "bg-red-50",
-    iconColor: "text-red-600",
-  },
-  {
-    id: "DOC-2024-042",
-    name: "Cloud Architecture Guideline",
-    category: "Infrastructure",
-    type: "SOP",
-    status: "Pending",
-    version: "1.0.5",
-    score: "7.2",
-    updatedAt: "Hôm qua, 09:15",
-    author: "Minh Tú",
-    icon: "menu_book",
-    bgColor: "bg-blue-50",
-    iconColor: "text-blue-600",
-  },
-  {
-    id: "DOC-2024-058",
-    name: "Monthly Security Audit Report",
-    category: "Compliance",
-    type: "SOP",
-    status: "Draft",
-    version: "0.9.0",
-    score: "--",
-    updatedAt: "12 Th04, 2024",
-    author: "Alex Trần",
-    icon: "edit_document",
-    bgColor: "bg-neutral-100",
-    iconColor: "text-neutral-600",
-  },
-  {
-    id: "DOC-2024-012",
-    name: "Data Privacy Policy 2024",
-    category: "Legal",
-    type: "Policy",
-    status: "Approved",
-    version: "2.1.0",
-    score: "8.8",
-    updatedAt: "08 Th04, 2024",
-    author: "Minh Tú",
-    icon: "policy",
-    bgColor: "bg-green-50",
-    iconColor: "text-green-600",
-  },
-];
+const TYPE_OPTIONS = [
+  { value: "", label: "Tất cả loại" },
+  { value: DocumentType.POLICY, label: "Policy" },
+  { value: DocumentType.MANUAL, label: "Manual / Runbook" },
+  { value: DocumentType.REPORT, label: "Report" },
+  { value: DocumentType.OTHER, label: "Other" },
+]
 
 export default function DocumentsPage() {
-  // 1. Khai báo State cho các bộ lọc
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("Tất cả");
-  const [typeFilter, setTypeFilter] = useState("Tất cả");
+  const [search, setSearch] = useState("")
+  const [status, setStatus] = useState("")
+  const [type, setType] = useState("")
 
-  // 2. Logic Lọc dữ liệu (Real-time)
-  const filteredDocs = mockData.filter((doc) => {
-    // Ép về chữ thường để tìm kiếm không phân biệt hoa thường
-    const matchesSearch =
-      doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.id.toLowerCase().includes(searchQuery.toLowerCase());
+  const params = useMemo(
+    () => ({
+      page: 1,
+      page_size: 100,
+      search: search.trim() || undefined,
+      status: (status || undefined) as DocumentStatus | undefined,
+      document_type: (type || undefined) as DocumentType | undefined,
+    }),
+    [search, status, type],
+  )
 
-    const matchesStatus =
-      statusFilter === "Tất cả" || doc.status === statusFilter;
-    const matchesType = typeFilter === "Tất cả" || doc.type === typeFilter;
-
-    // Phải thỏa mãn CẢ 3 điều kiện mới được hiển thị
-    return matchesSearch && matchesStatus && matchesType;
-  });
-
-  //3. State quản lý việc mở/đóng Modal Upload
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const { data, isLoading, error, refetch } = useDocumentList(params)
 
   return (
-    <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* ... (Giữ nguyên phần Page Header có nút Tải lên) ... */}
-        {/* Page Header */}
-        <div className="flex justify-between items-end">
+    <div className="flex-1 overflow-y-auto p-8">
+      <div className="mx-auto max-w-7xl space-y-8">
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="space-y-1">
-            <h2 className="text-3xl font-extrabold tracking-tight text-on-surface">
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
               Quản lý tài liệu
-            </h2>
-            <p className="text-on-surface-variant text-sm">
-              Trung tâm lưu trữ và kiểm duyệt tri thức hệ thống Architect SOC.
+            </h1>
+            <p className="text-sm text-slate-500">
+              Upload, versioning, chấm điểm và phê duyệt tài liệu.
             </p>
           </div>
-          <div className="flex justify-between items-end">
-            {/* ... */}
-            <button
-              onClick={() => setIsUploadModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 transition-colors rounded-lg text-sm font-medium text-white"
+          <div className="flex gap-2">
+            <Link
+              href="/generate"
+              className="inline-flex items-center gap-2 rounded-lg border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
             >
-              <span className="material-symbols-outlined text-sm">
-                upload_file
-              </span>
-              Tải lên
-            </button>
+              <Plus size={16} />
+              Tạo tài liệu
+            </Link>
+            <Link
+              href="/documents/upload"
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            >
+              <Upload size={16} />
+              Upload
+            </Link>
           </div>
         </div>
 
-        {/* Truyền State và hàm SetState xuống cho Filter */}
-        <DocumentFilters
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          statusFilter={statusFilter}
-          setStatusFilter={setStatusFilter}
-          typeFilter={typeFilter}
-          setTypeFilter={setTypeFilter}
-        />
+        <div className="grid gap-3 rounded-xl border border-slate-100 bg-white p-4 shadow-sm md:grid-cols-[1fr_220px_180px_auto]">
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Tìm theo tên tài liệu..."
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          />
+          <select
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          >
+            {STATUS_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={type}
+            onChange={(event) => setType(event.target.value)}
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          >
+            {TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
+          >
+            Làm mới
+          </button>
+        </div>
 
-        {/* Truyền danh sách ĐÃ ĐƯỢC LỌC xuống cho Table */}
-        <DocumentTable documents={filteredDocs} />
+        {error && (
+          <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+            Không tải được danh sách tài liệu. Kiểm tra backend ở port 8000.
+          </div>
+        )}
 
-        <DocumentStats />
+        <DocumentTable items={data?.items ?? []} isLoading={isLoading} />
       </div>
-      {/* Hiển thị Modal Upload */}
-      {isUploadModalOpen && (
-        <UploadForm onClose={() => setIsUploadModalOpen(false)} />
-      )}
     </div>
-  );
+  )
 }

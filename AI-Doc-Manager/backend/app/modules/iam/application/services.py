@@ -1,11 +1,12 @@
 import logging
 from uuid import UUID
 
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import get_settings
-from app.core.exceptions import ConflictError, UnauthorizedError
+from app.core.exceptions import ConflictError, NotFoundError, UnauthorizedError, ValidationError
 from app.core.security import create_access_token, get_password_hash, verify_password
 from app.modules.iam.domain.models import Privilege, Role, User, UserRole
 from app.modules.iam.domain.principal import AuthenticatedUser
@@ -21,7 +22,18 @@ from app.shared.utils import utcnow
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SELF_SERVICE_PERMISSION = "GET:/api/v1/auth/me"
+DEFAULT_USER_PERMISSIONS = [
+    "GET:/api/v1/auth/me",
+    "POST:/api/v1/auth/logout",
+    "POST:/api/v1/auth/password-changed",
+    "GET:/api/v1/documents",
+    "GET:/api/v1/documents/{document_id}",
+    "GET:/api/v1/documents/{document_id}/download-url",
+    "GET:/api/v1/documents/{document_id}/download",
+    "GET:/api/v1/documents/{document_id}/versions",
+    "GET:/api/v1/documents/{document_id}/reviews",
+    "POST:/api/v1/qa/chat",
+]
 
 
 def build_principal(user: User) -> AuthenticatedUser:
@@ -71,24 +83,133 @@ def _ensure_default_user_role(session: Session) -> Role:
         session.add(role)
         session.flush()
 
-    privilege = get_privilege_by_role_and_endpoint(
-        session,
-        role_id=role.id,
-        api_endpoint=DEFAULT_SELF_SERVICE_PERMISSION,
-    )
-    if privilege is None:
-        session.add(
-            Privilege(
-                role_id=role.id,
-                api_endpoint=DEFAULT_SELF_SERVICE_PERMISSION,
-                is_allowed=True,
-            )
+    for permission in DEFAULT_USER_PERMISSIONS:
+        privilege = get_privilege_by_role_and_endpoint(
+            session,
+            role_id=role.id,
+            api_endpoint=permission,
         )
-        session.flush()
-    elif privilege.is_allowed is not True:
-        privilege.is_allowed = True
+        if privilege is None:
+            session.add(
+                Privilege(
+                    role_id=role.id,
+                    api_endpoint=permission,
+                    is_allowed=True,
+                )
+            )
+            session.flush()
+        elif privilege.is_allowed is not True:
+            privilege.is_allowed = True
 
     return role
+
+
+def list_roles(session: Session) -> list[Role]:
+    stmt = select(Role).options(joinedload(Role.privileges)).order_by(Role.role_name)
+    return list(session.execute(stmt).unique().scalars().all())
+
+
+def list_users(session: Session) -> list[User]:
+    stmt = (
+        select(User)
+        .options(
+            joinedload(User.user_roles)
+            .joinedload(UserRole.role)
+            .joinedload(Role.privileges)
+        )
+        .order_by(User.username)
+    )
+    return list(session.execute(stmt).unique().scalars().all())
+
+
+def _load_roles_by_name(session: Session, role_names: list[str]) -> list[Role]:
+    normalized = sorted({name.strip().lower() for name in role_names if name.strip()})
+    if not normalized:
+        raise ValidationError("At least one role is required")
+
+    roles = list(
+        session.execute(select(Role).where(Role.role_name.in_(normalized)))
+        .scalars()
+        .all()
+    )
+    found = {role.role_name for role in roles}
+    missing = [role_name for role_name in normalized if role_name not in found]
+    if missing:
+        raise ValidationError(f"Unknown role(s): {', '.join(missing)}")
+    return roles
+
+
+def assign_roles_to_user(
+    session: Session,
+    *,
+    user_id: UUID,
+    role_names: list[str],
+    assigned_by: UUID | None,
+) -> User:
+    user = get_user_by_id(session, user_id)
+    if user is None:
+        raise NotFoundError("User not found")
+
+    roles = _load_roles_by_name(session, role_names)
+    session.execute(delete(UserRole).where(UserRole.user_id == user_id))
+    now = utcnow()
+    for role in roles:
+        session.add(
+            UserRole(
+                user_id=user_id,
+                role_id=role.id,
+                assigned_by=assigned_by,
+                assigned_at=now,
+            )
+        )
+    session.commit()
+    session.expire_all()
+
+    refreshed_user = get_user_by_id(session, user_id)
+    if refreshed_user is None:
+        raise NotFoundError("User not found")
+    return refreshed_user
+
+
+def create_user(
+    session: Session,
+    *,
+    username: str,
+    password: str,
+    role_names: list[str],
+    created_by: UUID | None,
+) -> User:
+    if get_user_by_username(session, username) is not None:
+        raise ConflictError("Username already exists")
+
+    roles = _load_roles_by_name(session, role_names or ["viewer"])
+    user = User(
+        username=username,
+        password_hash=get_password_hash(password),
+        last_password_changed=utcnow(),
+    )
+    session.add(user)
+    try:
+        session.flush()
+        now = utcnow()
+        for role in roles:
+            session.add(
+                UserRole(
+                    user_id=user.id,
+                    role_id=role.id,
+                    assigned_by=created_by,
+                    assigned_at=now,
+                )
+            )
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        raise ConflictError("Username already exists") from exc
+
+    refreshed_user = get_user_by_id(session, user.id)
+    if refreshed_user is None:
+        raise NotFoundError("User not found")
+    return refreshed_user
 
 
 def register_user(session: Session, username: str, password: str) -> AuthenticatedUser:

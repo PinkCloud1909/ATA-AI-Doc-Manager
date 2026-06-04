@@ -14,6 +14,16 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=8, max_length=255)
 
 
+class AdminUserCreateRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=100)
+    password: str = Field(min_length=8, max_length=255)
+    role_names: list[str] = Field(default_factory=lambda: ["viewer"])
+
+
+class AssignRolesRequest(BaseModel):
+    role_names: list[str] = Field(min_length=1)
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"

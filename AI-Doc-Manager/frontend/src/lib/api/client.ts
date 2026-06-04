@@ -3,11 +3,12 @@ import { getCurrentIdToken } from "@/lib/auth/firebase"
 import {
   clearStoredAccessToken,
   getStoredAccessToken,
-  setStoredAccessToken,
 } from "./authToken"
 
 const BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1"
+  typeof window !== "undefined"
+    ? "/api/v1"
+    : process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1"
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
@@ -19,20 +20,13 @@ interface RetryableRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean
 }
 
-async function getDevAccessToken(): Promise<string | null> {
-  if (typeof window === "undefined") return null
-  const { data } = await axios.post(`${BASE_URL}/auth/login`, {
-    username: "admin",
-    password: "admin123",
-  })
-  const token = data?.access_token as string | undefined
-  if (token) setStoredAccessToken(token, data?.expires_in)
-  return token ?? null
-}
-
 apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
-  let token = getStoredAccessToken() || await getCurrentIdToken()
-  if (!token) token = await getDevAccessToken()
+  const url = config.url ?? ""
+  if (url.includes("/auth/login") || url.includes("/auth/register")) {
+    return config
+  }
+
+  const token = getStoredAccessToken() || await getCurrentIdToken()
 
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`
@@ -53,12 +47,6 @@ apiClient.interceptors.response.use(
     ) {
       originalRequest._retry = true
       clearStoredAccessToken()
-      const token = await getDevAccessToken()
-
-      if (token) {
-        originalRequest.headers.Authorization = `Bearer ${token}`
-        return apiClient(originalRequest)
-      }
     }
 
     return Promise.reject(error)

@@ -6,12 +6,51 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db_session
 from app.core.dependencies import require_permission
+from app.core.exceptions import ForbiddenError
+from app.modules.documents.application.services import get_document_by_id
 from app.modules.iam.domain.principal import AuthenticatedUser
 from app.modules.reviews.api.schemas import ReviewCreateRequest, ReviewResponse
 from app.modules.reviews.application.services import create_review, list_reviews, list_all_reviews
+from app.shared.enums import Status
 
 router = APIRouter(prefix="/api/v1/documents", tags=["reviews"])
 reviews_router = APIRouter(prefix="/api/v1/reviews", tags=["reviews"])
+
+ROLE_VISIBLE_STATUSES: dict[str, set[Status]] = {
+    "user": {Status.APPROVED, Status.EXPIRED},
+    "viewer": {Status.APPROVED, Status.EXPIRED},
+    "editor": {
+        Status.DRAFT,
+        Status.PENDING_REVIEW,
+        Status.APPROVED,
+        Status.REJECTED,
+        Status.EXPIRED,
+    },
+    "reviewer": {
+        Status.PENDING_REVIEW,
+        Status.APPROVED,
+        Status.REJECTED,
+        Status.EXPIRED,
+    },
+}
+
+
+def _ensure_can_view_document(
+    current_user: AuthenticatedUser,
+    session: Session,
+    document_id: UUID,
+) -> None:
+    role_names = {role_name.lower() for role_name in current_user.roles}
+    if "admin" in role_names:
+        return
+
+    allowed_statuses: set[Status] = set()
+    for role_name in role_names:
+        allowed_statuses.update(ROLE_VISIBLE_STATUSES.get(role_name, set()))
+
+    document = get_document_by_id(session, document_id)
+    if document.status not in allowed_statuses:
+        raise ForbiddenError("You do not have access to this document")
 
 
 @router.post(
@@ -25,6 +64,7 @@ def add_review(
     current_user: Annotated[AuthenticatedUser, Depends(require_permission())],
     session: Annotated[Session, Depends(get_db_session)],
 ) -> ReviewResponse:
+    _ensure_can_view_document(current_user, session, document_id)
     review = create_review(
         session,
         document_id=document_id,
@@ -52,6 +92,7 @@ def get_reviews(
     current_user: Annotated[AuthenticatedUser, Depends(require_permission())],
     session: Annotated[Session, Depends(get_db_session)],
 ) -> list[ReviewResponse]:
+    _ensure_can_view_document(current_user, session, document_id)
     reviews = list_reviews(session, document_id=document_id)
     return [
         ReviewResponse(

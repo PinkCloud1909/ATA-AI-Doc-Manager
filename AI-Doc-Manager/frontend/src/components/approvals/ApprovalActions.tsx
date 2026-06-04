@@ -2,83 +2,122 @@
 
 import { useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { approvalsApi } from "@/lib/api/approvals"
 import { documentKeys } from "@/hooks/useDocuments"
-import { toast } from "sonner"
 
 interface Props {
   documentId: string
-  onDone?:    () => void
+  onDone?: () => void
+  showSubmit?: boolean
+  showApprove?: boolean
 }
 
-export function ApprovalActions({ documentId, onDone }: Props) {
+export function ApprovalActions({
+  documentId,
+  onDone,
+  showSubmit = true,
+  showApprove = true,
+}: Props) {
   const qc = useQueryClient()
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [reason, setReason] = useState("")
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: documentKeys.all })
+    qc.invalidateQueries({ queryKey: ["approvals"] })
     onDone?.()
   }
 
-  const submit   = useMutation({ mutationFn: () => approvalsApi.submit(documentId),   onSuccess: () => { toast.success("Đã gửi duyệt"); invalidate() } })
-  const approve  = useMutation({ mutationFn: () => approvalsApi.approve(documentId),  onSuccess: () => { toast.success("Đã phê duyệt ✓"); invalidate() } })
-  const reject   = useMutation({
+  const submit = useMutation({
+    mutationFn: () => approvalsApi.submit(documentId),
+    onSuccess: () => {
+      toast.success("Đã gửi phê duyệt")
+      invalidate()
+    },
+    onError: () => toast.error("Không gửi phê duyệt được"),
+  })
+
+  const approve = useMutation({
+    mutationFn: () => approvalsApi.approve(documentId),
+    onSuccess: () => {
+      toast.success("Đã phê duyệt")
+      invalidate()
+    },
+    onError: () => toast.error("Không phê duyệt được"),
+  })
+
+  const reject = useMutation({
     mutationFn: () => approvalsApi.reject(documentId, reason),
-    onSuccess:  () => { toast.success("Đã từ chối"); setShowRejectModal(false); invalidate() },
+    onSuccess: () => {
+      toast.success("Đã từ chối")
+      setShowRejectModal(false)
+      setReason("")
+      invalidate()
+    },
+    onError: () => toast.error("Không từ chối được"),
   })
 
   return (
     <>
-      <div className="flex gap-2 flex-wrap">
-        <button
-          onClick={() => submit.mutate()}
-          disabled={submit.isPending}
-          className="px-3 py-1.5 text-sm bg-slate-700 hover:bg-slate-800 text-white rounded-lg transition-colors disabled:opacity-50"
-        >
-          Gửi duyệt
-        </button>
-        <button
-          onClick={() => approve.mutate()}
-          disabled={approve.isPending}
-          className="px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors disabled:opacity-50"
-        >
-          ✓ Phê duyệt
-        </button>
-        <button
-          onClick={() => setShowRejectModal(true)}
-          className="px-3 py-1.5 text-sm bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg transition-colors"
-        >
-          Từ chối
-        </button>
+      <div className="flex flex-wrap gap-2">
+        {showSubmit && (
+          <button
+            type="button"
+            onClick={() => submit.mutate()}
+            disabled={submit.isPending}
+            className="rounded-lg bg-slate-700 px-3 py-1.5 text-sm text-white transition-colors hover:bg-slate-800 disabled:opacity-50"
+          >
+            Gửi duyệt
+          </button>
+        )}
+        {showApprove && (
+          <>
+            <button
+              type="button"
+              onClick={() => approve.mutate()}
+              disabled={approve.isPending}
+              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+            >
+              Phê duyệt
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowRejectModal(true)}
+              className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm text-red-600 transition-colors hover:bg-red-100"
+            >
+              Từ chối
+            </button>
+          </>
+        )}
       </div>
 
-      {/* Reject modal */}
       {showRejectModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md space-y-4 rounded-xl bg-white p-6 shadow-2xl">
             <h3 className="font-semibold text-slate-800">Lý do từ chối</h3>
             <textarea
               value={reason}
-              onChange={(e) => setReason(e.target.value)}
+              onChange={(event) => setReason(event.target.value)}
               rows={4}
-              placeholder="Nhập lý do từ chối tài liệu…"
-              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg
-                         focus:outline-none focus:ring-2 focus:ring-red-400 resize-none"
+              placeholder="Nhập lý do từ chối tài liệu"
+              className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
             />
             <div className="flex justify-end gap-2">
               <button
+                type="button"
                 onClick={() => setShowRejectModal(false)}
-                className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg"
+                className="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100"
               >
-                Huỷ
+                Hủy
               </button>
               <button
+                type="button"
                 onClick={() => reject.mutate()}
                 disabled={!reason.trim() || reject.isPending}
-                className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg disabled:opacity-50"
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700 disabled:opacity-50"
               >
-                {reject.isPending ? "Đang xử lý…" : "Xác nhận từ chối"}
+                Xác nhận từ chối
               </button>
             </div>
           </div>

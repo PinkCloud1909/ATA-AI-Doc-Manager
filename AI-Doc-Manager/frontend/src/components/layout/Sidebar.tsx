@@ -56,6 +56,12 @@ export default function Sidebar() {
       icon: "manage_accounts",
       show: perm.canAdmin,
     },
+    {
+      href: "/admin/roles",
+      label: "Role Management",
+      icon: "admin_panel_settings",
+      show: perm.canAdmin,
+    },
   ];
 
   const visibleItems = navItems.filter((i) => i.show !== false);
