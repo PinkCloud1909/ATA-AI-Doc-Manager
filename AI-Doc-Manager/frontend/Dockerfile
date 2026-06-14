@@ -34,7 +34,7 @@ ENV HOSTNAME=0.0.0.0
 # Standalone output từ next.config.ts output: "standalone"
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static     ./.next/static
-COPY --from=builder /app/public           ./public
+# COPY --from=builder /app/public           ./public
 
 EXPOSE 8080
 
