@@ -184,4 +184,3 @@ def seed_iam_data(
         "admin_username": settings.default_admin_username,
         "admin_role": settings.default_admin_role_name,
     }
-

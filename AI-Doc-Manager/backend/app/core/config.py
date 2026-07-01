@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     minio_presigned_expiry_minutes: int = 15
     max_upload_size_mb: int = 50
 
+    # GCS signed-URL TTL (production).  Kept separate from MinIO so the two
+    # adapters can be tuned independently without touching each other's config.
+    gcs_presigned_expiry_minutes: int = 15
+
     default_admin_username: str = Field(default="admin", max_length=100)
     default_admin_password: str = Field(default="admin123", min_length=8)
     default_admin_role_name: str = Field(default="admin", max_length=50)
@@ -55,6 +59,8 @@ class Settings(BaseSettings):
     chunk_size: int = 1000
     chunk_overlap: int = 200
     embedding_batch_size: int = 20
+    embedding_model: str = "gemini-embedding-2"
+    llm_model: str = "gemini-2.5-flash"
 
     # ChromaDB settings
     # Default port 8001 avoids conflict with FastAPI which runs on 8000
@@ -67,12 +73,36 @@ class Settings(BaseSettings):
     # Set to True ONLY in tests/dev where data loss on restart is acceptable.
     chroma_ephemeral: bool = False
 
-    # GCP / Vertex AI settings (required when ENV=prod)
+    # GCP / Vertex AI / Cloud SQL settings (required when ENVIRONMENT=production)
     gcp_project_id: str | None = None
     gcp_location: str = "us-central1"
+    gcs_bucket_name: str = "documents"
     vertex_index_id: str | None = None
     vertex_index_endpoint_id: str | None = None
     vertex_deployed_index_id: str | None = None
+
+    # Cloud SQL (Cloud Run production only).
+    # When set, db.py builds a Unix-socket URL instead of using DATABASE_URL.
+    # Format: "PROJECT_ID:REGION:INSTANCE_NAME"  (e.g. "myproj:us-central1:dms-pg")
+    # Leave unset (None) for local Docker Compose — DATABASE_URL is used instead.
+    cloud_sql_connection_name: str | None = None
+    # These are only needed when cloud_sql_connection_name is set.
+    db_user: str = "postgres"
+    db_password: str = "postgres"
+    db_name: str = "dms_backend"
+
+    # Cloud Tasks (production async vectorization).
+    # When CLOUD_TASKS_QUEUE_NAME is set AND ENVIRONMENT=production, the
+    # vectorization endpoints enqueue tasks instead of running synchronously.
+    # Leave unset for local Docker Compose — synchronous mode is used instead.
+    cloud_tasks_queue_name: str | None = None
+    cloud_tasks_location: str = "us-central1"
+    # The public URL of this Cloud Run service, used as the task target.
+    # Example: "https://dms-backend-abc123-uc.a.run.app"
+    worker_service_url: str | None = None
+    # Service account email that Cloud Tasks will use to generate OIDC tokens.
+    # Must have roles/run.invoker on this Cloud Run service.
+    cloud_run_sa_email: str | None = None
 
     @field_validator("cors_allowed_origins", mode="before")
     @classmethod

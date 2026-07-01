@@ -17,8 +17,8 @@ class GoogleAILlmAdapter(ILLMProvider):
         self.client = genai.Client(api_key=api_key) if api_key else genai.Client()
 
         # gemini-embedding-2 supports RETRIEVAL_DOCUMENT task type for better indexing quality
-        self.embedding_model = "gemini-embedding-2"
-        self.llm_model = "gemini-2.5-flash"
+        self.embedding_model = self.settings.embedding_model
+        self.llm_model = self.settings.llm_model
 
     def generate_embeddings(
         self,

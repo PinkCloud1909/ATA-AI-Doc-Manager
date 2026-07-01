@@ -1,6 +1,5 @@
 import logging
 import uuid
-from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -27,9 +26,11 @@ async def generate_runbook_task(
     user_id: UUID,
 ) -> Runbook:
     # 1. Validate documents exist
-    docs = session.execute(
-        select(Document).where(Document.id.in_(document_ids))
-    ).scalars().all()
+    docs = (
+        session.execute(select(Document).where(Document.id.in_(document_ids)))
+        .scalars()
+        .all()
+    )
 
     found_ids = {doc.id for doc in docs}
     missing_ids = [str(did) for did in document_ids if did not in found_ids]
@@ -45,7 +46,10 @@ async def generate_runbook_task(
         )
 
     # Resolve title
-    resolved_title = title or f"Runbook for {purpose.replace('_', ' ').title()} - {utcnow().strftime('%Y-%m-%d %H:%M')}"
+    resolved_title = (
+        title
+        or f"Runbook for {purpose.replace('_', ' ').title()} - {utcnow().strftime('%Y-%m-%d %H:%M')}"
+    )
 
     # 2. Create the runbook record in database
     now = utcnow()

@@ -5,10 +5,9 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.config import get_settings
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.modules.documents.domain.models import Document
-from app.shared.interfaces import IObjectStorage
+from app.shared.interfaces import IObjectStorage, IVectorStore
 from app.shared.enums import DocumentType, Status
 from app.shared.utils import utcnow
 
@@ -165,6 +164,7 @@ def delete_document_permanently(
     session: Session,
     document_id: UUID,
     minio_adapter: IObjectStorage,
+    vector_store: IVectorStore,
 ) -> None:
     document = get_document_by_id(session, document_id)
     file_link = document.file_link
@@ -178,6 +178,14 @@ def delete_document_permanently(
         logger.warning(
             "minio_delete_failed",
             extra={"document_id": str(document_id), "file_link": file_link},
+        )
+
+    try:
+        vector_store.delete_document(str(document_id))
+    except Exception as exc:
+        logger.warning(
+            "vector_delete_failed",
+            extra={"document_id": str(document_id), "error": str(exc)},
         )
 
     logger.info("document_deleted_permanently", extra={"document_id": str(document_id)})
@@ -197,11 +205,14 @@ def create_new_version(
 ) -> Document:
     source = get_document_by_id(session, source_document_id)
 
-    max_version = session.execute(
-        select(func.max(Document.version)).where(
-            Document.document_group_id == source.document_group_id
-        )
-    ).scalar() or 0
+    max_version = (
+        session.execute(
+            select(func.max(Document.version)).where(
+                Document.document_group_id == source.document_group_id
+            )
+        ).scalar()
+        or 0
+    )
 
     now = utcnow()
     new_doc = Document(
@@ -240,7 +251,9 @@ def submit_document_for_review(
 ) -> Document:
     document = get_document_by_id(session, document_id)
     if document.status not in {Status.DRAFT, Status.REJECTED}:
-        raise ConflictError("Only draft or rejected documents can be submitted for review")
+        raise ConflictError(
+            "Only draft or rejected documents can be submitted for review"
+        )
 
     now = utcnow()
     document.status = Status.PENDING_REVIEW
@@ -265,13 +278,17 @@ def approve_document(
         raise ConflictError("Only pending documents can be approved")
 
     now = utcnow()
-    expired_documents = session.execute(
-        select(Document).where(
-            Document.document_group_id == document.document_group_id,
-            Document.status == Status.APPROVED,
-            Document.id != document.id,
+    expired_documents = (
+        session.execute(
+            select(Document).where(
+                Document.document_group_id == document.document_group_id,
+                Document.status == Status.APPROVED,
+                Document.id != document.id,
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     for expired in expired_documents:
         expired.status = Status.EXPIRED
         expired.modified_by = user_id

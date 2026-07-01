@@ -1,6 +1,5 @@
-import uuid
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any
 
 
@@ -12,11 +11,19 @@ class IObjectStorage(ABC):
         pass
 
     @abstractmethod
-    def upload_file(self, file_path: str, object_key: str, content_type: str | None = None) -> str:
+    def upload_file(
+        self, file_path: str, object_key: str, content_type: str | None = None
+    ) -> str:
         pass
 
     @abstractmethod
-    def upload_fileobj(self, file_obj: Any, object_key: str, content_type: str | None = None, length: int = -1) -> str:
+    def upload_fileobj(
+        self,
+        file_obj: Any,
+        object_key: str,
+        content_type: str | None = None,
+        length: int = -1,
+    ) -> str:
         pass
 
     @abstractmethod
@@ -24,7 +31,9 @@ class IObjectStorage(ABC):
         pass
 
     @abstractmethod
-    def generate_presigned_download_url(self, object_reference: str, expires: timedelta | None = None) -> str:
+    def generate_presigned_download_url(
+        self, object_reference: str, expires: timedelta | None = None
+    ) -> str:
         pass
 
     @abstractmethod
@@ -45,7 +54,13 @@ class IVectorStore(ABC):
     """Port for vector database operations (e.g. ChromaDB, Vertex AI Vector Search)."""
 
     @abstractmethod
-    def upsert_document(self, document_id: str, text_chunks: list[str], embeddings: list[list[float]], metadata: dict | None = None) -> None:
+    def upsert_document(
+        self,
+        document_id: str,
+        text_chunks: list[str],
+        embeddings: list[list[float]],
+        metadata: dict | None = None,
+    ) -> None:
         pass
 
     @abstractmethod

@@ -3,17 +3,18 @@ import uuid
 from contextlib import contextmanager
 from unittest.mock import MagicMock
 
-import pytest
 
 from app.main import app
-from app.modules.documents.api.router import _get_storage
+from app.modules.documents.api.router import _get_storage, _get_vectors
 from app.modules.documents.domain.models import Document
 from app.shared.enums import DocumentType, Status
 from app.shared.utils import utcnow
 
 
 MOCK_FILE_LINK = "minio://documents/documents/2026/05/01/abc123-test.pdf"
-MOCK_DOWNLOAD_URL = "http://localhost:9000/documents/documents/2026/05/01/abc123-test.pdf?presigned=1"
+MOCK_DOWNLOAD_URL = (
+    "http://localhost:9000/documents/documents/2026/05/01/abc123-test.pdf?presigned=1"
+)
 
 
 @contextmanager
@@ -29,6 +30,16 @@ def _override_storage(mock_adapter):
         yield mock_adapter
     finally:
         app.dependency_overrides.pop(_get_storage, None)
+
+
+@contextmanager
+def _override_vectors(mock_adapter):
+    """Temporarily replace the _get_vectors FastAPI dependency with a mock."""
+    app.dependency_overrides[_get_vectors] = lambda: mock_adapter
+    try:
+        yield mock_adapter
+    finally:
+        app.dependency_overrides.pop(_get_vectors, None)
 
 
 def _login_admin(client) -> str:
@@ -269,12 +280,13 @@ class TestSoftDeleteDocument:
 
 class TestHardDeleteDocument:
     def test_permanent_delete(self, client, db_session):
-        mock_adapter = MagicMock()
+        mock_storage = MagicMock()
+        mock_vectors = MagicMock()
 
         doc = _create_test_document(db_session)
         doc_id = doc.id
         token = _login_admin(client)
-        with _override_storage(mock_adapter):
+        with _override_storage(mock_storage), _override_vectors(mock_vectors):
             response = client.delete(
                 f"/api/v1/documents/{doc_id}/permanent",
                 headers=_auth_header(token),
@@ -282,6 +294,8 @@ class TestHardDeleteDocument:
 
         assert response.status_code == 200
         assert response.json()["detail"] == "Document permanently deleted"
+        mock_storage.delete_object.assert_called_once_with(MOCK_FILE_LINK)
+        mock_vectors.delete_document.assert_called_once_with(str(doc_id))
 
 
 class TestNewVersion:
@@ -296,7 +310,9 @@ class TestNewVersion:
             response = client.post(
                 f"/api/v1/documents/{doc.id}/new-version",
                 headers=_auth_header(token),
-                files={"file": ("v2.pdf", io.BytesIO(b"v2 content"), "application/pdf")},
+                files={
+                    "file": ("v2.pdf", io.BytesIO(b"v2 content"), "application/pdf")
+                },
             )
 
         assert response.status_code == 201

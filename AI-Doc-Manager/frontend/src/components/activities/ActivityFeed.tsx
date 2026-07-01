@@ -81,8 +81,8 @@ const MOCK_ACTIVITY_GROUPS: ActivityGroup[] = [
         details: (
           <>
             <p className="italic border-l-2 border-surface-variant pl-3 line-clamp-2">
-              "Cần cập nhật thêm số liệu dự phóng cho năm 2025 trong phần kết
-              luận nhé."
+              &ldquo;Cần cập nhật thêm số liệu dự phóng cho năm 2025 trong phần kết
+              luận nhé.&rdquo;
             </p>
             <p className="text-xs text-on-surface-variant mt-2 not-italic">
               Trong tài liệu:{" "}

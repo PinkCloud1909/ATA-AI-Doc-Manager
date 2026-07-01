@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "typecheck": "tsc --noEmit",
     "test": "vitest"
   },
   "dependencies": {
@@ -16,12 +17,10 @@
     "firebase": "^10.14.1",
     "lucide-react": "^0.395.0",
     "next": "16.2.4",
-    "nextjs": "^0.0.3",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "react-markdown": "^9.0.1",
     "sonner": "^1.7.4",
-    "tailwind": "^4.0.0",
     "tailwind-merge": "^2.3.0",
     "uuid": "^10.0.0",
     "zustand": "^4.5.2"

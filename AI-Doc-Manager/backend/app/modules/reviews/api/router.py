@@ -7,7 +7,11 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db_session
 from app.core.dependencies import require_permission
 from app.modules.iam.domain.principal import AuthenticatedUser
-from app.modules.reviews.api.schemas import ReviewCreateRequest, ReviewListResponse, ReviewResponse
+from app.modules.reviews.api.schemas import (
+    ReviewCreateRequest,
+    ReviewListResponse,
+    ReviewResponse,
+)
 from app.modules.reviews.application.services import create_review, list_reviews
 
 router = APIRouter(prefix="/api/v1/documents", tags=["reviews"])
@@ -75,4 +79,3 @@ def get_reviews(
         page=page,
         page_size=page_size,
     )
-

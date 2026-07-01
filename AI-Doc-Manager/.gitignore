@@ -93,6 +93,7 @@ backend/.tox/
 backend/.hypothesis/
 backend/pytest-cache-files-*
 backend/.ruff_cache/
+backend/.chroma_data/
 
 # Frontend Next.js
 frontend/.next/

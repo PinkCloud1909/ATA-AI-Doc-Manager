@@ -14,7 +14,7 @@ export default function AiCuratorCard() {
         </h2>
         <p className="text-sm opacity-80 leading-relaxed" style={{}}>
           Dựa trên xu hướng truy cập, bộ phận Marketing có thể cần tài liệu về
-          "Chiến lược nội dung Q3". Bạn có muốn tạo bản nháp ngay?
+          &ldquo;Chiến lược nội dung Q3&rdquo;. Bạn có muốn tạo bản nháp ngay?
         </p>
       </div>
       <div className="mt-8 relative z-10">

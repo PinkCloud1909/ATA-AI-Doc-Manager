@@ -53,7 +53,9 @@ def authenticate_user(session: Session, username: str, password: str) -> User:
     return user
 
 
-def issue_access_token(session: Session, username: str, password: str) -> tuple[str, int]:
+def issue_access_token(
+    session: Session, username: str, password: str
+) -> tuple[str, int]:
     user = authenticate_user(session, username=username, password=password)
     return create_access_token(subject=str(user.id), username=user.username)
 
@@ -133,7 +135,9 @@ def register_user(session: Session, username: str, password: str) -> Authenticat
 def load_principal(session: Session, user_id: UUID) -> AuthenticatedUser:
     user = get_user_by_id(session, user_id)
     if user is None:
-        logger.warning("auth_failure", extra={"reason": "user_not_found", "user_id": str(user_id)})
+        logger.warning(
+            "auth_failure", extra={"reason": "user_not_found", "user_id": str(user_id)}
+        )
         raise UnauthorizedError("Invalid authentication credentials")
 
     return build_principal(user)
@@ -171,6 +175,7 @@ def create_user_with_roles(
             role = get_role_by_name(session, role_name)
             if role is None:
                 from app.core.exceptions import NotFoundError
+
                 raise NotFoundError(f"Role '{role_name}' not found")
             session.add(
                 UserRole(
@@ -206,11 +211,13 @@ def list_all_users(
     items = []
     for user in users:
         role_names = sorted({ur.role.role_name for ur in user.user_roles if ur.role})
-        items.append({
-            "id": user.id,
-            "username": user.username,
-            "roles": role_names,
-        })
+        items.append(
+            {
+                "id": user.id,
+                "username": user.username,
+                "roles": role_names,
+            }
+        )
     return items, total
 
 
@@ -219,6 +226,7 @@ def get_user_detail(session: Session, user_id: UUID) -> dict:
     user = get_user_by_id(session, user_id)
     if user is None:
         from app.core.exceptions import NotFoundError
+
         raise NotFoundError("User not found")
     role_names = sorted({ur.role.role_name for ur in user.user_roles if ur.role})
     return {
@@ -239,14 +247,17 @@ def assign_role_to_user(
     user = get_user_by_id(session, user_id)
     if user is None:
         from app.core.exceptions import NotFoundError
+
         raise NotFoundError("User not found")
 
     role = get_role_by_name(session, role_name)
     if role is None:
         from app.core.exceptions import NotFoundError
+
         raise NotFoundError(f"Role '{role_name}' not found")
 
     from app.modules.iam.infrastructure.repositories import get_user_role
+
     existing = get_user_role(session, user_id=user.id, role_id=role.id)
     if existing is not None:
         raise ConflictError(f"User already has role '{role_name}'")
@@ -278,17 +289,21 @@ def remove_role_from_user(
     user = get_user_by_id(session, user_id)
     if user is None:
         from app.core.exceptions import NotFoundError
+
         raise NotFoundError("User not found")
 
     role = get_role_by_name(session, role_name)
     if role is None:
         from app.core.exceptions import NotFoundError
+
         raise NotFoundError(f"Role '{role_name}' not found")
 
     from app.modules.iam.infrastructure.repositories import get_user_role
+
     assignment = get_user_role(session, user_id=user.id, role_id=role.id)
     if assignment is None:
         from app.core.exceptions import NotFoundError
+
         raise NotFoundError(f"User does not have role '{role_name}'")
 
     session.delete(assignment)

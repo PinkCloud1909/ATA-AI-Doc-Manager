@@ -1,4 +1,3 @@
-import os
 from functools import lru_cache
 
 from app.core.config import Settings, get_settings
@@ -10,13 +9,16 @@ from app.shared.adapters.vertex_ai_llm_adapter import VertexAILlmAdapter
 from app.shared.adapters.vertex_vector_adapter import VertexVectorAdapter
 from app.shared.interfaces import ILLMProvider, IObjectStorage, IVectorStore
 
+# Both "prod" and "production" are treated as production so that either value
+# of ENVIRONMENT activates GCS / Vertex adapters.  This matches the JWT-secret
+# validation in config.py which also accepts both spellings.
+_PROD_ENVS = {"production", "prod"}
+
 
 @lru_cache()
 def get_object_storage(settings: Settings | None = None) -> IObjectStorage:
     settings = settings or get_settings()
-    env = os.getenv("ENV", "local").lower()
-
-    if env == "prod":
+    if settings.environment.lower() in _PROD_ENVS:
         return GCSStorageAdapter(settings)
     return MinioStorageAdapter(settings)
 
@@ -24,9 +26,7 @@ def get_object_storage(settings: Settings | None = None) -> IObjectStorage:
 @lru_cache()
 def get_vector_store(settings: Settings | None = None) -> IVectorStore:
     settings = settings or get_settings()
-    env = os.getenv("ENV", "local").lower()
-
-    if env == "prod":
+    if settings.environment.lower() in _PROD_ENVS:
         return VertexVectorAdapter(settings)
     return ChromaVectorAdapter(settings)
 
@@ -34,8 +34,6 @@ def get_vector_store(settings: Settings | None = None) -> IVectorStore:
 @lru_cache()
 def get_llm_provider(settings: Settings | None = None) -> ILLMProvider:
     settings = settings or get_settings()
-    env = os.getenv("ENV", "local").lower()
-
-    if env == "prod":
+    if settings.environment.lower() in _PROD_ENVS:
         return VertexAILlmAdapter(settings)
     return GoogleAILlmAdapter(settings)

@@ -100,9 +100,7 @@ def _read_upload_chunked(
             break
         total += len(chunk)
         if total > max_bytes:
-            raise ValidationError(
-                f"File size exceeds maximum of {max_mb} MB"
-            )
+            raise ValidationError(f"File size exceeds maximum of {max_mb} MB")
         chunks.append(chunk)
     return io.BytesIO(b"".join(chunks)), total
 
@@ -360,8 +358,14 @@ def hard_delete_document(
     current_user: Annotated[AuthenticatedUser, Depends(require_permission())],
     session: Annotated[Session, Depends(get_db_session)],
     storage: Annotated[IObjectStorage, Depends(_get_storage)],
+    vectors: Annotated[IVectorStore, Depends(_get_vectors)],
 ) -> DocumentDeleteResponse:
-    delete_document_permanently(session, document_id=document_id, minio_adapter=storage)
+    delete_document_permanently(
+        session,
+        document_id=document_id,
+        minio_adapter=storage,
+        vector_store=vectors,
+    )
     return DocumentDeleteResponse(
         detail="Document permanently deleted",
         document_id=document_id,

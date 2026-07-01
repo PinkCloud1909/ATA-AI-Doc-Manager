@@ -24,7 +24,9 @@ def create_review(
 
     document = get_document_by_id(session, document_id)
     if document.status not in {Status.PENDING_REVIEW, Status.APPROVED}:
-        raise ConflictError("Reviews are only allowed for pending or approved documents")
+        raise ConflictError(
+            "Reviews are only allowed for pending or approved documents"
+        )
 
     review = DocumentReview(
         document_id=document.id,
@@ -71,4 +73,3 @@ def list_reviews(
     )
 
     return list(reviews), total
-

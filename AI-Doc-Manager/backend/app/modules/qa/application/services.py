@@ -114,9 +114,7 @@ class ChatService:
             if content and getattr(content, "role", None) == "model":
                 parts = getattr(content, "parts", [])
                 text_parts = [
-                    getattr(p, "text", None)
-                    for p in parts
-                    if getattr(p, "text", None)
+                    getattr(p, "text", None) for p in parts if getattr(p, "text", None)
                 ]
                 if text_parts:
                     return "".join(text_parts)

@@ -93,9 +93,7 @@ class TestExtractDocx:
         doc.save(buf)
         docx_bytes = buf.getvalue()
 
-        result = extractor.extract(
-            docx_bytes, content_type=None, filename="file.docx"
-        )
+        result = extractor.extract(docx_bytes, content_type=None, filename="file.docx")
         assert "Extension DOCX" in result
 
 

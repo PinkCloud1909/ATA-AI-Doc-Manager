@@ -15,7 +15,9 @@ class Runbook(Base):
     purpose: Mapped[str] = mapped_column(String(100), nullable=False)
     document_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     content: Mapped[str | None] = mapped_column(Text, nullable=True)
-    status: Mapped[str] = mapped_column(String(50), nullable=False, default="generating")
+    status: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="generating"
+    )
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         Uuid,

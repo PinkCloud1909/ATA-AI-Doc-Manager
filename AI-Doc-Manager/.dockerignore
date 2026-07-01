@@ -40,6 +40,8 @@ backend/htmlcov/
 backend/.mypy_cache/
 backend/.ruff_cache/
 backend/.tox/
+backend/*.egg-info/
+backend/.chroma_data/
 
 # Build outputs and local data
 build/

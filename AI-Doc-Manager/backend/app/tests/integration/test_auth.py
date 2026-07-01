@@ -82,7 +82,10 @@ def test_me_with_valid_token(client):
     ("headers", "expected_detail"),
     [
         ({}, "Authentication credentials were not provided"),
-        ({"Authorization": "Bearer invalid-token"}, "Invalid authentication credentials"),
+        (
+            {"Authorization": "Bearer invalid-token"},
+            "Invalid authentication credentials",
+        ),
     ],
 )
 def test_me_without_or_with_invalid_token(client, headers, expected_detail):

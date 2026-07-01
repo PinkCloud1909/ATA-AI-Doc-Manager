@@ -13,9 +13,12 @@ import logging
 from google.adk.agents.llm_agent import Agent
 from google.adk.tools import FunctionTool
 
+from app.core.config import get_settings
 from app.shared.adapters.factory import get_llm_provider, get_vector_store
 
 logger = logging.getLogger(__name__)
+
+_settings = get_settings()
 
 
 def search_documents(query: str, top_k: int = 5) -> str:
@@ -84,8 +87,10 @@ def search_documents(query: str, top_k: int = 5) -> str:
 # The root agent used by ChatService.
 # It has one tool (search_documents) and a grounding instruction that forces
 # it to cite retrieved chunks rather than making up answers.
+# The model name is read from settings so that LLM_MODEL env var controls
+# which Gemini model is used without requiring a code change.
 root_agent = Agent(
-    model="gemini-2.0-flash",
+    model=_settings.llm_model,
     name="dms_assistant",
     description="A RAG-powered assistant for the Document Management System.",
     instruction="""You are an expert assistant for a Document Management System (DMS).

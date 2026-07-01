@@ -119,9 +119,15 @@ def downgrade() -> None:
     op.drop_index("ix_documents_rejected_by", table_name="documents")
     op.drop_index("ix_documents_approved_by", table_name="documents")
     op.drop_index("ix_documents_submitted_by", table_name="documents")
-    op.drop_constraint("fk_documents_rejected_by_users", "documents", type_="foreignkey")
-    op.drop_constraint("fk_documents_approved_by_users", "documents", type_="foreignkey")
-    op.drop_constraint("fk_documents_submitted_by_users", "documents", type_="foreignkey")
+    op.drop_constraint(
+        "fk_documents_rejected_by_users", "documents", type_="foreignkey"
+    )
+    op.drop_constraint(
+        "fk_documents_approved_by_users", "documents", type_="foreignkey"
+    )
+    op.drop_constraint(
+        "fk_documents_submitted_by_users", "documents", type_="foreignkey"
+    )
     op.drop_column("documents", "rejected_at")
     op.drop_column("documents", "rejected_reason")
     op.drop_column("documents", "rejected_by")

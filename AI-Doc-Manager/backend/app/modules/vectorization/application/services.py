@@ -1,13 +1,15 @@
 import logging
 import time
+import uuid
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.core.exceptions import NotFoundError, ValidationError
+from app.modules.documents.domain.chunk_model import DocumentChunk
 from app.modules.documents.domain.models import Document
 from app.modules.vectorization.domain.text_chunker import TextChunker
 from app.modules.vectorization.domain.text_extractor import TextExtractor
@@ -131,6 +133,25 @@ def vectorize_document(
     #     early, with a clear error message instead of a cryptic Chroma exception.
     _validate_embeddings(chunks, all_embeddings)
 
+    # 5c. Persist text chunks to PostgreSQL BEFORE writing to the vector store.
+    #     This is the source of truth for text retrieval in the Vertex adapter:
+    #     find_neighbors returns datapoint IDs, which we resolve against this table.
+    #     For ChromaDB (local dev), text is stored inline in the collection, so
+    #     this write is redundant but kept for consistency and future auditability.
+    try:
+        _persist_chunks(
+            session=session,
+            document_id=document_id,
+            chunks=chunks,
+            embedding_model=settings.embedding_model,
+        )
+    except Exception as exc:
+        logger.error(
+            "vectorization_chunk_persist_failed",
+            extra={"document_id": str(document_id), "error": str(exc)},
+        )
+        raise ValidationError(f"Failed to persist text chunks to database: {exc}") from exc
+
     # 6. Upsert into vector store
     metadata = {
         "document_id": str(document_id),
@@ -219,6 +240,22 @@ def delete_document_vectors(
         )
         raise ValidationError(f"Failed to delete vectors: {exc}") from exc
 
+    # Step 1b: delete corresponding text chunks from PostgreSQL.
+    #          Done after vector store delete so if the DB step fails the
+    #          vectors are already gone (vector store is the source of truth
+    #          for "is vectorized"), leaving rows orphaned but not serving
+    #          stale search results.
+    try:
+        session.execute(
+            delete(DocumentChunk).where(DocumentChunk.document_id == document_id)
+        )
+    except Exception as exc:
+        logger.error(
+            "chunk_delete_failed",
+            extra={"document_id": str(document_id), "error": str(exc)},
+        )
+        raise ValidationError(f"Vectors deleted but text chunks could not be removed: {exc}") from exc
+
     # Step 2: update DB flag — if this fails, vectors are already gone
     try:
         document.is_vectorized = False
@@ -271,9 +308,7 @@ def _get_document(session: Session, document_id: UUID) -> Document:
     return document
 
 
-def _validate_embeddings(
-    chunks: list[str], embeddings: list[list[float]]
-) -> None:
+def _validate_embeddings(chunks: list[str], embeddings: list[list[float]]) -> None:
     """Validate that embeddings align with chunks before upserting.
 
     Raises ``ValidationError`` if:
@@ -301,3 +336,56 @@ def _validate_embeddings(
                 f"Inconsistent embedding dimensions at chunk {i}: "
                 f"expected {dim}, got {len(emb)}."
             )
+
+
+def _persist_chunks(
+    session: Session,
+    document_id: UUID,
+    chunks: list[str],
+    embedding_model: str,
+) -> None:
+    """Upsert text chunks for *document_id* into the ``document_chunks`` table.
+
+    Strategy
+    --------
+    1. Delete all existing rows for this document (handles re-vectorization
+       where the chunk count may differ from the previous run).
+    2. Bulk-insert the new rows.
+
+    This runs inside the caller's already-open transaction so the delete and
+    insert are atomic with the rest of the vectorize_document operation.
+
+    Args:
+        session:         Active SQLAlchemy Session.
+        document_id:     UUID of the parent document.
+        chunks:          Ordered list of text chunks (index = chunk_index).
+        embedding_model: Name of the model used to generate the embeddings
+                         (stored for audit purposes).
+    """
+    now = utcnow()
+
+    # Remove any stale rows from a previous vectorization run.
+    session.execute(
+        delete(DocumentChunk).where(DocumentChunk.document_id == document_id)
+    )
+
+    # Bulk-insert all chunks in one statement.
+    if chunks:
+        session.bulk_save_objects(
+            [
+                DocumentChunk(
+                    id=uuid.uuid4(),
+                    document_id=document_id,
+                    chunk_index=i,
+                    text=text,
+                    embedding_model=embedding_model,
+                    vectorized_at=now,
+                )
+                for i, text in enumerate(chunks)
+            ]
+        )
+
+    logger.debug(
+        "chunk_persist_complete",
+        extra={"document_id": str(document_id), "chunk_count": len(chunks)},
+    )
