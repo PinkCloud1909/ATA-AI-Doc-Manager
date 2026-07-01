@@ -32,7 +32,9 @@ def get_current_user(
         raise UnauthorizedError("Invalid authentication credentials") from exc
 
     user = load_principal(session, user_id)
-    logger.info("auth_success", extra={"user_id": str(user.id), "path": request.url.path})
+    logger.info(
+        "auth_success", extra={"user_id": str(user.id), "path": request.url.path}
+    )
     return user
 
 

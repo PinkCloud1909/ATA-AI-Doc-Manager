@@ -169,7 +169,7 @@ export default function DocumentSidebar({
           <p
             className={`text-sm italic border-l-2 pl-3 ${isRejected ? "text-on-surface border-[#9f403d]/30" : "text-on-surface-variant border-outline-variant/30"}`}
           >
-            "{data.reviewer.comment}"
+            &ldquo;{data.reviewer.comment}&rdquo;
           </p>
         </div>
       )}

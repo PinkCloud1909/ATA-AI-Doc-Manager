@@ -5,6 +5,7 @@ services:
     env_file:
       - .env
     environment:
+      ENVIRONMENT: local
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       ASYNC_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       GOOGLE_API_KEY: ${GOOGLE_API_KEY}
@@ -22,11 +23,12 @@ services:
       minio:
         condition: service_started
     ports:
-      - "8000:8000"
+      # Host port 8000 → container port 8080 (Dockerfile default PORT=8080).
+      - "8000:8080"
     command: >
       sh -c "alembic upgrade head &&
       python scripts/seed.py &&
-      uvicorn app.main:app --host 0.0.0.0 --port 8000"
+      uvicorn app.main:app --host 0.0.0.0 --port 8080"
 
   postgres:
     image: postgres:16-alpine

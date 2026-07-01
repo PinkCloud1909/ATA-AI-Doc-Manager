@@ -62,10 +62,7 @@ def list_users(
     offset = (page - 1) * page_size
     stmt = (
         select(User)
-        .options(
-            joinedload(User.user_roles)
-            .joinedload(UserRole.role)
-        )
+        .options(joinedload(User.user_roles).joinedload(UserRole.role))
         .order_by(User.username)
         .offset(offset)
         .limit(page_size)

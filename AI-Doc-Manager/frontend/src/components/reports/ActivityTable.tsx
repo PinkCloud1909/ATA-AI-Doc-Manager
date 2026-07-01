@@ -120,7 +120,7 @@ export default function ActivityTable() {
                       <span className="font-normal text-on-surface-variant">
                         {activity.action}
                       </span>{" "}
-                      "{activity.target}"
+                      &ldquo;{activity.target}&rdquo;
                     </p>
                     <span className="text-[10px] text-on-surface-variant font-medium whitespace-nowrap ml-2 mt-0.5">
                       {activity.timestamp}

@@ -20,7 +20,9 @@ class MinioStorageAdapter(IObjectStorage):
             secure=self.settings.minio_secure,
         )
 
-        external_endpoint = self.settings.minio_external_endpoint or self.settings.minio_endpoint
+        external_endpoint = (
+            self.settings.minio_external_endpoint or self.settings.minio_endpoint
+        )
         self.external_client = Minio(
             endpoint=external_endpoint,
             access_key=self.settings.minio_access_key,
@@ -33,16 +35,26 @@ class MinioStorageAdapter(IObjectStorage):
         if not self.client.bucket_exists(self.bucket_name):
             self.client.make_bucket(self.bucket_name)
 
-    def upload_file(self, file_path: str, object_key: str, content_type: str | None = None) -> str:
+    def upload_file(
+        self, file_path: str, object_key: str, content_type: str | None = None
+    ) -> str:
         self.client.fput_object(
             bucket_name=self.bucket_name,
             object_name=object_key,
             file_path=file_path,
             content_type=content_type,
         )
-        return self._build_reference(bucket_name=self.bucket_name, object_key=object_key)
+        return self._build_reference(
+            bucket_name=self.bucket_name, object_key=object_key
+        )
 
-    def upload_fileobj(self, file_obj: Any, object_key: str, content_type: str | None = None, length: int = -1) -> str:
+    def upload_fileobj(
+        self,
+        file_obj: Any,
+        object_key: str,
+        content_type: str | None = None,
+        length: int = -1,
+    ) -> str:
         self.client.put_object(
             bucket_name=self.bucket_name,
             object_name=object_key,
@@ -51,13 +63,17 @@ class MinioStorageAdapter(IObjectStorage):
             content_type=content_type or "application/octet-stream",
             part_size=10 * 1024 * 1024,
         )
-        return self._build_reference(bucket_name=self.bucket_name, object_key=object_key)
+        return self._build_reference(
+            bucket_name=self.bucket_name, object_key=object_key
+        )
 
     def get_object_info(self, object_reference: str) -> Any:
         bucket_name, object_key = self._parse_reference(object_reference)
         return self.client.stat_object(bucket_name=bucket_name, object_name=object_key)
 
-    def generate_presigned_download_url(self, object_reference: str, expires: timedelta | None = None) -> str:
+    def generate_presigned_download_url(
+        self, object_reference: str, expires: timedelta | None = None
+    ) -> str:
         bucket_name, object_key = self._parse_reference(object_reference)
         ttl = expires or timedelta(minutes=self.settings.minio_presigned_expiry_minutes)
         return self.external_client.presigned_get_object(
@@ -72,7 +88,9 @@ class MinioStorageAdapter(IObjectStorage):
 
     def download_object(self, object_reference: str) -> bytes:
         bucket_name, object_key = self._parse_reference(object_reference)
-        response = self.client.get_object(bucket_name=bucket_name, object_name=object_key)
+        response = self.client.get_object(
+            bucket_name=bucket_name, object_name=object_key
+        )
         try:
             return response.read()
         finally:

@@ -108,8 +108,8 @@ class ChromaVectorAdapter(IVectorStore):
                 {
                     "text": doc,
                     "metadata": meta,
-                    "distance": distance,   # raw distance (lower = more similar)
-                    "score": similarity,    # cosine similarity (higher = more similar)
+                    "distance": distance,  # raw distance (lower = more similar)
+                    "score": similarity,  # cosine similarity (higher = more similar)
                 }
             )
 

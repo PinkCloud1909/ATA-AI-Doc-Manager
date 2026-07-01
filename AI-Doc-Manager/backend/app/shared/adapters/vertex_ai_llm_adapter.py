@@ -21,8 +21,8 @@ class VertexAILlmAdapter(ILLMProvider):
             location=getattr(self.settings, "gcp_location", "us-central1"),
         )
 
-        self.embedding_model = "text-embedding-004"
-        self.llm_model = "gemini-1.5-pro"
+        self.embedding_model = self.settings.embedding_model
+        self.llm_model = self.settings.llm_model
 
     def generate_embeddings(
         self,

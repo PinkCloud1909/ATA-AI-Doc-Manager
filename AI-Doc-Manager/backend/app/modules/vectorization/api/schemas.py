@@ -1,4 +1,3 @@
-from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -27,3 +26,22 @@ class BulkVectorizationResponse(BaseModel):
     results: list[VectorizationResponse]
     total_processed: int
     total_failed: int
+
+
+# --- Async / Cloud Tasks response schemas ---
+
+
+class TaskAcceptedResponse(BaseModel):
+    """Returned by POST /{document_id} when Cloud Tasks mode is active."""
+
+    document_id: UUID
+    message: str
+    task_name: str
+
+
+class BulkTaskAcceptedResponse(BaseModel):
+    """Returned by POST /bulk when Cloud Tasks mode is active."""
+
+    accepted: list[str]  # document_id strings successfully enqueued
+    failed: list[str]  # document_id strings that failed to enqueue
+    message: str

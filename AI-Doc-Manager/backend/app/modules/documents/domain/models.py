@@ -33,13 +33,19 @@ status_enum = Enum(
 class Document(Base):
     __tablename__ = "documents"
     __table_args__ = (
-        UniqueConstraint("document_group_id", "version", name="uq_documents_group_version"),
+        UniqueConstraint(
+            "document_group_id", "version", name="uq_documents_group_version"
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    document_group_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
+    document_group_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, nullable=False, index=True
+    )
     version: Mapped[int] = mapped_column(Integer, nullable=False)
-    document_type: Mapped[DocumentType] = mapped_column(document_type_enum, nullable=False)
+    document_type: Mapped[DocumentType] = mapped_column(
+        document_type_enum, nullable=False
+    )
     status: Mapped[Status] = mapped_column(status_enum, nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)

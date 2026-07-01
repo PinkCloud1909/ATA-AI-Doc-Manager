@@ -57,7 +57,9 @@ class TestChunking:
         assert len(result) > 1
         # Each chunk should be at most chunk_size characters (stripped)
         for c in result:
-            assert len(c) <= chunker.chunk_size + 5  # allow some slack for boundary logic
+            assert (
+                len(c) <= chunker.chunk_size + 5
+            )  # allow some slack for boundary logic
 
     def test_chunks_cover_full_text(self):
         """Verify that no content is lost — all original text chars appear in at least one chunk."""

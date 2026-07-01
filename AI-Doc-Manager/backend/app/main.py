@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -17,6 +18,7 @@ from app.modules.iam.api.admin_router import admin_router
 from app.modules.qa.api.router import router as qa_router
 from app.modules.reviews.api.router import router as reviews_router
 from app.modules.vectorization.api.router import router as vectorization_router
+from app.modules.vectorization.api.worker_router import worker_router
 from app.modules.runbooks.api.router import router as runbooks_router
 from app.shared.schemas import HealthResponse, ReadyResponse
 from app.shared.utils import generate_request_id
@@ -32,8 +34,6 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     yield
     logger.info("application_shutdown")
 
-
-from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(
     title=settings.app_name,
@@ -57,6 +57,7 @@ app.include_router(approvals_router)
 app.include_router(reviews_router)
 app.include_router(qa_router)
 app.include_router(vectorization_router)
+app.include_router(worker_router)
 app.include_router(runbooks_router)
 
 
@@ -65,20 +66,22 @@ async def request_context_middleware(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID") or generate_request_id()
     set_request_id(request_id)
     start = time.perf_counter()
-    response = await call_next(request)
-    duration_ms = round((time.perf_counter() - start) * 1000, 2)
-    response.headers["X-Request-ID"] = request_id
-    logger.info(
-        "request_completed",
-        extra={
-            "method": request.method,
-            "path": request.url.path,
-            "status_code": response.status_code,
-            "duration_ms": duration_ms,
-        },
-    )
-    clear_request_id()
-    return response
+    try:
+        response = await call_next(request)
+        duration_ms = round((time.perf_counter() - start) * 1000, 2)
+        response.headers["X-Request-ID"] = request_id
+        logger.info(
+            "request_completed",
+            extra={
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": response.status_code,
+                "duration_ms": duration_ms,
+            },
+        )
+        return response
+    finally:
+        clear_request_id()
 
 
 @app.get("/health", response_model=HealthResponse, tags=["system"])
