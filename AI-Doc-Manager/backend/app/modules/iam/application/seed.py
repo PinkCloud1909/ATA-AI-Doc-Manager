@@ -20,6 +20,10 @@ DOCUMENT_READ_PRIVILEGES = [
     "GET:/api/v1/documents/{document_id}/versions",
     "GET:/api/v1/documents/{document_id}/reviews",
     "POST:/api/v1/qa/chat",
+    "GET:/api/v1/reports/summary",
+    "GET:/api/v1/reports/approval-rate",
+    "GET:/api/v1/reports/avg-grade",
+    "GET:/api/v1/reports/activity",
 ]
 
 EDITOR_PRIVILEGES = [

@@ -10,7 +10,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build-time env vars (public ones baked into bundle)
+# Build-time env vars baked into the Next.js standalone config/client bundle
+ARG BACKEND_URL
+ENV BACKEND_URL=$BACKEND_URL
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_FIREBASE_API_KEY
 ARG NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN

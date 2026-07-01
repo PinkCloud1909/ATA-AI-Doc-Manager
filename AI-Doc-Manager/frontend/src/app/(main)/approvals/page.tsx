@@ -28,7 +28,7 @@ export default function ApprovalsPage() {
 
       {error && (
         <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-          Không tải được hàng đợi phê duyệt. Kiểm tra backend ở port 8000.
+          Không tải được hàng đợi phê duyệt. Vui lòng đăng nhập lại hoặc kiểm tra quyền truy cập.
         </div>
       )}
 

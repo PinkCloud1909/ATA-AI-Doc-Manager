@@ -82,7 +82,7 @@ export default function DocumentDetailPage() {
     return (
       <div className="p-8">
         <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-          Không tải được tài liệu. Kiểm tra backend ở port 8000.
+          Không tải được tài liệu. Vui lòng đăng nhập lại hoặc kiểm tra quyền truy cập.
         </div>
       </div>
     )

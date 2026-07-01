@@ -112,7 +112,7 @@ export default function DocumentsPage() {
 
         {error && (
           <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-            Không tải được danh sách tài liệu. Kiểm tra backend ở port 8000.
+            Không tải được danh sách tài liệu. Vui lòng đăng nhập lại hoặc kiểm tra kết nối backend.
           </div>
         )}
 

@@ -19,7 +19,7 @@ export function useAuth() {
       setUser(me)
       router.push("/dashboard")
     } catch {
-      setError("Đăng nhập thất bại. Kiểm tra username, mật khẩu và backend port 8000.")
+      setError("Đăng nhập thất bại. Kiểm tra username, mật khẩu hoặc kết nối backend.")
     } finally {
       setIsLoading(false)
     }

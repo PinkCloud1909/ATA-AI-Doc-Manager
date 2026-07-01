@@ -77,7 +77,7 @@ export default function ChatPage() {
         {
           id: crypto.randomUUID(),
           role: "ai",
-          text: "Không gọi được backend chat. Kiểm tra FastAPI ở port 8000 rồi thử lại.",
+          text: "Không gọi được backend chat. Vui lòng kiểm tra kết nối hoặc đăng nhập lại.",
           timestamp: now(),
           badgeType: "generated",
         },
