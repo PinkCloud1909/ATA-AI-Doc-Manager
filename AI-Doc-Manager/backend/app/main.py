@@ -20,6 +20,8 @@ from app.modules.reviews.api.router import router as reviews_router
 from app.modules.vectorization.api.router import router as vectorization_router
 from app.modules.vectorization.api.worker_router import worker_router
 from app.modules.runbooks.api.router import router as runbooks_router
+from app.modules.reports.api.router import router as reports_router
+from app.modules.generate.api.router import router as generate_router
 from app.shared.schemas import HealthResponse, ReadyResponse
 from app.shared.utils import generate_request_id
 
@@ -59,6 +61,8 @@ app.include_router(qa_router)
 app.include_router(vectorization_router)
 app.include_router(worker_router)
 app.include_router(runbooks_router)
+app.include_router(reports_router)
+app.include_router(generate_router)
 
 
 @app.middleware("http")

@@ -49,6 +49,8 @@ export default function Sidebar() {
       show: perm.canApprove,
     },
     { href: "/chat", label: "AI Chat", icon: "forum" },
+    { href: "/generate", label: "Generate", icon: "smart_toy" },
+    { href: "/reports", label: "Reports", icon: "bar_chart" },
     { href: "/admin/users", label: "User Management", icon: "manage_accounts" },
   ];
 

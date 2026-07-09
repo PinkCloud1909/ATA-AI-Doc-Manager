@@ -360,3 +360,12 @@ def expire_document(
     session.commit()
     logger.info("document_expired", extra={"document_id": str(document_id)})
     return document
+
+
+def average_grade(session: Session, document_id: UUID) -> float | None:
+    value = session.execute(
+        select(func.avg(DocumentReview.grade)).where(
+            DocumentReview.document_id == document_id
+        )
+    ).scalar_one_or_none()
+    return float(value) if value is not None
