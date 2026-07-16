@@ -81,6 +81,9 @@ frontend/.tern-port
 # Database
 postgres_data/
 minio_data/
+backend/*.db
+backend/*.db.*
+storage/
 
 # Logs
 *.log
