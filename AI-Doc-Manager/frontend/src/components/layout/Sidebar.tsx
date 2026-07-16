@@ -5,12 +5,12 @@ import { usePathname } from "next/navigation";
 import { usePermission } from "@/hooks/usePermission";
 import { useAuth } from "@/hooks/useAuth";
 import { useState, useRef, useEffect } from "react";
-// Import SettingsModal mà chúng ta đã tạo ở bước trước
 import SettingsModal from "@/components/settings/SettingsModal";
+import { useTranslation } from "@/i18n/LanguageContext";
 
 interface NavItem {
   href: string;
-  label: string;
+  translationKey: string;
   icon: string;
   show?: boolean;
 }
@@ -19,10 +19,11 @@ export default function Sidebar() {
   const pathname = usePathname();
   const perm = usePermission();
   const { user, logout } = useAuth();
+  const { t } = useTranslation();
 
   const [isHovered, setIsHovered] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false); // State quản lý Modal Cài đặt
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
@@ -40,19 +41,44 @@ export default function Sidebar() {
   }, []);
 
   const navItems: NavItem[] = [
-    { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
-    { href: "/documents", label: "Documents", icon: "description" },
+    { href: "/dashboard", translationKey: "nav.dashboard", icon: "dashboard" },
+    { href: "/documents", translationKey: "nav.documents", icon: "description" },
     {
       href: "/approvals",
-      label: "Reviews",
+      translationKey: "nav.approvals",
       icon: "rate_review",
       show: perm.canApprove,
     },
-    { href: "/chat", label: "AI Chat", icon: "forum" },
-    { href: "/admin/users", label: "User Management", icon: "manage_accounts" },
+    { href: "/chat", translationKey: "nav.chat", icon: "forum" },
+    { href: "/runbooks", translationKey: "nav.runbooks", icon: "auto_stories" },
+    {
+      href: "/admin/users",
+      translationKey: "nav.admin",
+      icon: "manage_accounts",
+      show: perm.canAdmin,
+    },
   ];
 
   const visibleItems = navItems.filter((i) => i.show !== false);
+
+  // Resolve translation key to string
+  const tr = (key: string): string => {
+    const parts = key.split(".");
+    let val: unknown = t;
+    for (const part of parts) {
+      if (val && typeof val === "object" && part in val) {
+        val = (val as Record<string, unknown>)[part];
+      } else {
+        return key;
+      }
+    }
+    return typeof val === "string" ? val : key;
+  };
+
+  const getUserInitials = () => {
+    const name = user?.username || "";
+    return name.slice(0, 2).toUpperCase() || "U";
+  };
 
   return (
     <>
@@ -62,7 +88,6 @@ export default function Sidebar() {
           setIsHovered(false);
           setIsProfileOpen(false);
         }}
-        // ĐÃ SỬA TẠI ĐÂY: Loại bỏ 'hidden md:flex', thay bằng 'flex' và tối ưu CSS cho màn hình nhỏ
         className={`flex flex-col h-full bg-surface-container-low border-r border-transparent py-4 transition-all duration-300 ease-in-out z-[70] overflow-visible shrink-0 ${
           isHovered
             ? "w-64 px-4 absolute md:relative shadow-[4px_0_24px_rgba(0,0,0,0.15)] md:shadow-none h-full"
@@ -75,7 +100,7 @@ export default function Sidebar() {
         >
           {isHovered && (
             <h1 className="text-xl font-black text-on-surface font-headline tracking-tighter whitespace-nowrap">
-              Architect SOC
+              {t.common.appName}
             </h1>
           )}
           <div
@@ -89,10 +114,10 @@ export default function Sidebar() {
             {isHovered && (
               <div className="whitespace-nowrap transition-opacity duration-300">
                 <p className="text-sm font-bold font-headline text-on-surface">
-                  The Workspace
+                  {t.common.appName}
                 </p>
                 <p className="text-xs text-on-surface-variant">
-                  Knowledge Curator
+                  {t.common.appTagline}
                 </p>
               </div>
             )}
@@ -107,7 +132,7 @@ export default function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
-                title={!isHovered ? item.label : ""}
+                title={!isHovered ? tr(item.translationKey) : ""}
                 className={`flex items-center gap-3 rounded-lg transition-all duration-200 overflow-hidden ${
                   isHovered
                     ? "px-3 py-2"
@@ -128,7 +153,7 @@ export default function Sidebar() {
                   <span
                     className={`font-medium text-sm whitespace-nowrap ${isActive ? "font-semibold" : ""}`}
                   >
-                    {item.label}
+                    {tr(item.translationKey)}
                   </span>
                 )}
               </Link>
@@ -142,7 +167,6 @@ export default function Sidebar() {
           ref={profileMenuRef}
         >
           {/* Popup Menu */}
-          {/* Đã sửa lỗi logic ở đây: Xóa isSettingsOpen khỏi điều kiện */}
           {isProfileOpen && isHovered && (
             <div className="absolute bottom-full left-0 md:left-3 mb-2 w-56 bg-white rounded-xl shadow-xl border border-neutral-100 py-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
               <Link
@@ -152,33 +176,23 @@ export default function Sidebar() {
                 <span className="material-symbols-outlined text-neutral-500 text-[20px]">
                   person
                 </span>
-                <span className="font-medium">Hồ sơ</span>
+                <span className="font-medium">{t.nav.profile}</span>
               </Link>
 
-              {/* ĐÃ SỬA: Đổi Link thành Button để mở Modal */}
               <button
                 onClick={() => {
                   setIsSettingsOpen(true);
-                  setIsProfileOpen(false); // Đóng menu popup khi mở Cài đặt
+                  setIsProfileOpen(false);
                 }}
                 className="w-full flex items-center gap-3 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors"
               >
                 <span className="material-symbols-outlined text-neutral-500 text-[20px]">
                   settings
                 </span>
-                <span className="font-medium">Cài đặt</span>
+                <span className="font-medium">{t.nav.settings}</span>
               </button>
 
               <div className="h-[1px] bg-neutral-100 my-1 mx-2"></div>
-              <Link
-                href="/help"
-                className="flex items-center gap-3 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors"
-              >
-                <span className="material-symbols-outlined text-neutral-500 text-[20px]">
-                  help_outline
-                </span>
-                <span className="font-medium">Trợ giúp</span>
-              </Link>
               <button
                 onClick={logout}
                 className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
@@ -186,7 +200,7 @@ export default function Sidebar() {
                 <span className="material-symbols-outlined text-red-500 text-[20px]">
                   logout
                 </span>
-                <span className="font-medium">Đăng xuất</span>
+                <span className="font-medium">{t.auth.logout}</span>
               </button>
             </div>
           )}
@@ -195,25 +209,20 @@ export default function Sidebar() {
           <div
             onClick={() => isHovered && setIsProfileOpen(!isProfileOpen)}
             className={`flex items-center gap-3 py-2 rounded-lg transition-colors ${isHovered ? "px-3 cursor-pointer hover:bg-surface-container" : "justify-center"}`}
-            title={!isHovered ? user?.email || "Profile" : ""}
+            title={!isHovered ? user?.username || "Profile" : ""}
           >
-            <div className="w-9 h-9 rounded-full bg-surface-dim overflow-hidden flex-shrink-0">
-              <img
-                className="w-full h-full object-cover"
-                src={
-                  user?.photoURL ||
-                  "https://lh3.googleusercontent.com/aida-public/AB6AXuBuyuu8zmjPttIZPT3lGPo8DgSzcg7XZ1dUU2QchCDRKEjAjnQbJ7AwNGG8ODe2_JP_Hnwd_G5Y_dlXw30_-R5iUIo-ehH9KkWb1ugTW6mix2wQ6HEXzvhXMLR6HQoXHd0TpocZjhVwMK7S4vl-2L_pQmMBCB_8pAtQmEX7RDes8OQi9u7N0anfTkx6Olp0dOyHmR3V4u6rl8nYEnIOxTnmFF21C44lWo98Ju4VIhiHhnL-T1e90xB9mcRBTFEKYHV7yUcYcL3B_kD_"
-                }
-                alt="User avatar"
-              />
+            <div className="w-9 h-9 rounded-full bg-surface-dim overflow-hidden flex-shrink-0 flex items-center justify-center">
+              <span className="text-xs font-bold text-on-surface-variant">
+                {getUserInitials()}
+              </span>
             </div>
             {isHovered && (
               <div className="min-w-0">
                 <p className="text-sm font-bold text-on-surface truncate">
-                  {user?.displayName || "Người dùng"}
+                  {user?.username || t.nav.profile}
                 </p>
                 <p className="text-[10px] text-on-surface-variant truncate uppercase">
-                  {perm.canAdmin ? "QUẢN TRỊ VIÊN" : "USER"}
+                  {perm.canAdmin ? "ADMIN" : "USER"}
                 </p>
               </div>
             )}
@@ -221,7 +230,7 @@ export default function Sidebar() {
         </div>
       </aside>
 
-      {/* RENDER MODAL CÀI ĐẶT Ở ĐÂY */}
+      {/* Settings Modal */}
       {isSettingsOpen && (
         <SettingsModal onClose={() => setIsSettingsOpen(false)} />
       )}

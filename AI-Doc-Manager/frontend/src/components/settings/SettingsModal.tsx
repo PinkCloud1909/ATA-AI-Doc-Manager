@@ -2,24 +2,26 @@
 import { useState } from "react";
 import GeneralTab from "./GeneralTab";
 import SecurityTab from "./SecurityTab";
+import { useTranslation } from "@/i18n/LanguageContext";
 
 interface SettingsModalProps {
   onClose: () => void;
 }
 
 export default function SettingsModal({ onClose }: SettingsModalProps) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<"general" | "security">("general");
 
   return (
     // Dimmed Background Overlay
     <div
       className="fixed inset-0 bg-inverse-surface/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4 sm:p-8"
-      onClick={onClose} // Đóng khi bấm ra ngoài
+      onClick={onClose}
     >
       {/* Modal Container */}
       <div
         className="bg-surface-container-lowest w-full max-w-4xl h-[600px] min-h-[600px] rounded-xl flex overflow-hidden shadow-[0_10px_15px_-3px_rgba(43,52,55,0.08),0_4px_6px_-1px_rgba(43,52,55,0.04)] relative"
-        onClick={(e) => e.stopPropagation()} // Ngăn chặn sự kiện click lan ra overlay
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
         <button
@@ -32,10 +34,10 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
         {/* Sidebar Navigation */}
         <div className="w-64 bg-surface-container-low border-r border-surface-variant/20 flex flex-col py-8 px-4 z-0">
           <h2 className="font-manrope font-bold text-xl text-on-surface px-4 mb-6">
-            Cài đặt
+            {t.settings.title}
           </h2>
           <nav className="flex flex-col gap-1">
-            {/* Tab Chung */}
+            {/* Tab General */}
             <button
               onClick={() => setActiveTab("general")}
               className={`flex items-center gap-3 px-4 py-2.5 rounded-lg font-inter text-sm font-medium transition-colors relative ${activeTab === "general" ? "bg-surface-container-lowest text-on-surface shadow-sm" : "text-on-surface-variant hover:bg-surface-container"}`}
@@ -53,10 +55,10 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
               >
                 tune
               </span>
-              Chung
+              {t.settings.general}
             </button>
 
-            {/* Tab Bảo mật */}
+            {/* Tab Security */}
             <button
               onClick={() => setActiveTab("security")}
               className={`flex items-center gap-3 px-4 py-2.5 rounded-lg font-inter text-sm font-medium transition-colors relative ${activeTab === "security" ? "bg-surface-container-lowest text-on-surface shadow-sm" : "text-on-surface-variant hover:bg-surface-container"}`}
@@ -74,7 +76,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
               >
                 security
               </span>
-              Bảo mật
+              {t.settings.security}
             </button>
           </nav>
         </div>

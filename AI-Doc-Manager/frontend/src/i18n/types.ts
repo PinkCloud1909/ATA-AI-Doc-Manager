@@ -1,0 +1,66 @@
+export type Language = "en" | "vi";
+
+export interface TranslationDict {
+  common: Record<string, string>;
+  auth: Record<string, string>;
+  nav: Record<string, string>;
+  dashboard: Record<string, string>;
+  documents: {
+    title: string;
+    subtitle: string;
+    uploadTitle: string;
+    uploadSubtitle: string;
+    uploadButton: string;
+    uploading: string;
+    dragDrop: string;
+    supportedFormats: string;
+    chooseFile: string;
+    selectedFile: string;
+    details: string;
+    documentName: string;
+    documentType: string;
+    description: string;
+    descriptionPlaceholder: string;
+    selectType: string;
+    filters: Record<string, string>;
+    table: Record<string, string>;
+    detail: Record<string, string>;
+    stats: Record<string, string>;
+  };
+  status: Record<string, string>;
+  documentType: Record<string, string>;
+  approvals: Record<string, string>;
+  chat: Record<string, string>;
+  runbooks: {
+    title: string;
+    subtitle: string;
+    generateTitle: string;
+    generating: string;
+    generateButton: string;
+    generatedSuccessfully: string;
+    generationFailed: string;
+    deleteConfirm: string;
+    deletedSuccessfully: string;
+    noRunbooks: string;
+    promptLabel: string;
+    promptPlaceholder: string;
+    selectDocuments: string;
+    selectDocumentsDesc: string;
+    selectedCount: string;
+    titleLabel: string;
+    titlePlaceholder: string;
+    status: Record<string, string>;
+    created: string;
+    viewRunbook: string;
+    documentsUsed: string;
+    emptyPrompt: string;
+    emptyDocuments: string;
+  };
+  admin: Record<string, string>;
+  profile: Record<string, string>;
+  settings: Record<string, string>;
+  notifications: Record<string, string>;
+  errors: Record<string, string>;
+  activity: Record<string, string>;
+  language: Record<string, string>;
+}

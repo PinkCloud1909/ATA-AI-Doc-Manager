@@ -1,21 +1,23 @@
 "use client";
 
-import SummaryCards from "@/components/reports/SummaryCards";
-import StatusChart from "@/components/reports/StatusChart";
-import ActivityTable from "@/components/reports/ActivityTable";
+import { useTranslation } from "@/i18n/LanguageContext";
+import SummaryCards from "@/components/dashboard/SummaryCards";
+import StatusChart from "@/components/dashboard/StatusChart";
+import ActivityTable from "@/components/dashboard/ActivityTable";
 // Import AiCuratorCard nếu bạn có component này
-import AiCuratorCard from "@/components/reports/AiCuratorCard";
+import AiCuratorCard from "@/components/dashboard/AiCuratorCard";
 
 export default function DashboardPage() {
+  const { t } = useTranslation();
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8 min-w-0">
       {/* Header Dashboard */}
       <div>
         <h1 className="text-3xl font-extrabold text-on-surface tracking-tight">
-          Dashboard
+          {t.dashboard.title}
         </h1>
         <p className="text-sm text-on-surface-variant mt-1">
-          Tổng quan hệ thống quản lý tài liệu tri thức
+          {t.dashboard.subtitle}
         </p>
       </div>
 

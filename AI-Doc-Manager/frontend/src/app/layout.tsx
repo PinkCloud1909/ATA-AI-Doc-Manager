@@ -3,8 +3,8 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "Runbook Platform",
-  description: "Hệ thống quản lý tài liệu kỹ thuật tích hợp AI",
+  title: "AI Doc Manager",
+  description: "AI-powered document management system with RAG search",
 };
 
 export default function RootLayout({

@@ -1,23 +1,28 @@
-"use client"
+"use client";
 
-import { useQuery } from "@tanstack/react-query"
-import { approvalsApi } from "@/lib/api/approvals"
-import { StatusBadge } from "@/components/documents/StatusBadge"
-import { ApprovalActions } from "@/components/approvals/ApprovalActions"
-import Link from "next/link"
+import { useTranslation, formatT } from "@/i18n/LanguageContext";
+import { usePendingApprovals, useApproveDocument, useRejectDocument } from "@/hooks/useDocuments";
+import { StatusBadge } from "@/components/documents/StatusBadge";
+import { ApprovalActions } from "@/components/approvals/ApprovalActions";
+import { useQueryClient } from "@tanstack/react-query";
+import { approvalKeys } from "@/hooks/useDocuments";
+import Link from "next/link";
 
 export default function ApprovalsPage() {
-  const { data: queue, isLoading, refetch } = useQuery({
-    queryKey: ["approvals", "queue"],
-    queryFn:  approvalsApi.getPendingQueue,
-  })
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const { data: queue, isLoading } = usePendingApprovals();
+
+  const handleDone = () => {
+    qc.invalidateQueries({ queryKey: approvalKeys.pending() });
+  };
 
   return (
     <div className="space-y-6 min-w-0">
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">Phê duyệt</h1>
+        <h1 className="text-2xl font-bold text-slate-800">{t.approvals.title}</h1>
         <p className="text-sm text-slate-500 mt-0.5">
-          {queue?.length ?? "…"} tài liệu đang chờ xét duyệt
+          {formatT(t.approvals.subtitle, { count: queue?.length ?? 0 })}
         </p>
       </div>
 
@@ -30,27 +35,35 @@ export default function ApprovalsPage() {
           </div>
         ) : !queue?.length ? (
           <div className="py-16 text-center text-slate-400 text-sm">
-            Không có tài liệu nào đang chờ duyệt 🎉
+            {t.approvals.noPending}
           </div>
         ) : (
           <ul className="divide-y divide-slate-100">
             {queue.map((doc) => (
-              <li key={doc.id} className="flex items-center justify-between px-5 py-4 gap-4 hover:bg-slate-50 transition-colors min-w-0">
+              <li
+                key={doc.document_id}
+                className="flex items-center justify-between px-5 py-4 gap-4 hover:bg-slate-50 transition-colors min-w-0"
+              >
                 <div className="min-w-0 flex-1">
                   <Link
-                    href={`/documents/${doc.id}`}
+                    href={`/documents/${doc.document_id}`}
                     className="font-medium text-slate-800 hover:text-blue-600 text-sm truncate block"
                   >
-                    {doc.file_link.split("/").pop()}
+                    {doc.document_id}
                   </Link>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    v{doc.version} · {doc.created_by_name} ·{" "}
-                    {new Date(doc.created_at).toLocaleDateString("vi-VN")}
+                    v{doc.version} ·{" "}
+                    {doc.submitted_at
+                      ? new Date(doc.submitted_at).toLocaleDateString("vi-VN")
+                      : ""}
                   </p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <StatusBadge status={doc.status} />
-                  <ApprovalActions documentId={doc.id} onDone={() => refetch()} />
+                  <ApprovalActions
+                    documentId={doc.document_id}
+                    onDone={handleDone}
+                  />
                 </div>
               </li>
             ))}
@@ -58,5 +71,5 @@ export default function ApprovalsPage() {
         )}
       </div>
     </div>
-  )
+  );
 }

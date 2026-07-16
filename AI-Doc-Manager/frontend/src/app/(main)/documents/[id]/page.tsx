@@ -1,253 +1,368 @@
+"use client";
+
+import { use, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import DocumentPreview from "@/components/documents/DocumentPreview";
 import DocumentSidebar, {
   DocumentDetailData,
 } from "@/components/documents/DocumentSidebar";
-import React from "react";
-// Import hook kiểm tra quyền của bạn
-// import { usePermission } from "@/hooks/usePermission";
+import { useDocument, useApproveDocument, useRejectDocument, useCreateReview } from "@/hooks/useDocuments";
+import { usePermission } from "@/hooks/usePermission";
+import { useTranslation } from "@/i18n/LanguageContext";
+import { toast } from "sonner";
+import apiClient from "@/lib/api/client";
+import { vectorizationApi } from "@/lib/api/vectorization";
 
-// === DỮ LIỆU MOCK THEO TỪNG ID TÀI LIỆU ===
+function mapDocumentToSidebar(doc: any, t: any): DocumentDetailData {
+  const statusLabels: Record<string, string> = {
+    draft: t.status.draft,
+    pending_review: t.status.pending_review,
+    approved: t.status.approved,
+    rejected: t.status.rejected,
+    expired: t.status.expired,
+    archived: t.status.archived,
+  };
 
-const MOCK_DOCUMENTS: Record<
-  string,
-  { preview: any; sidebar: DocumentDetailData }
-> = {
-  "DOC-2024-001": {
-    preview: {
-      title: "Kế Hoạch Ứng Phó Sự Cố v4",
-
-      description:
-        "Tài liệu này trình bày các quy trình tiêu chuẩn để xử lý các sự cố an ninh mạng trong tổ chức.",
-
-      content: (
-        <>
-          <h2 className="text-2xl font-headline font-semibold mt-8 mb-4">
-            1. Mục Đích
-          </h2>
-
-          <p>
-            Cung cấp khuôn khổ có cấu trúc và có hệ thống để phát hiện, phân
-            tích, ngăn chặn sự cố an ninh mạng.
-          </p>
-
-          <div className="bg-surface-container-low p-6 rounded-lg my-6 border-l-4 border-tertiary">
-            <h3 className="font-headline font-semibold text-lg mb-2">
-              Lưu ý Quan Trọng
-            </h3>
-
-            <p className="text-sm text-on-surface-variant">
-              Liên hệ ngay với Trưởng nhóm SOC qua số khẩn cấp nội bộ khi có sự
-              cố P1.
-            </p>
-          </div>
-        </>
-      ),
-    },
-
-    sidebar: {
-      id: "DOC-2024-001",
-
-      title: "Kế Hoạch Ứng Phó Sự Cố",
-
-      status: "Approved",
-
-      version: "v4.2.1",
-
-      aiAssessment: {
-        score: "8.5",
-
-        label: "Khá Tốt",
-
-        summary: "Cấu trúc rõ ràng, cần bổ sung chi tiết về phần phục hồi.",
-
-        points: [
-          {
-            isPositive: true,
-
-            text: "Phần 'Phạm Vi' được định nghĩa rất rõ ràng.",
-          },
-
-          {
-            isPositive: false,
-
-            text: "Cần chỉ định rõ thời gian cho bước 'Phục Hồi'.",
-          },
-        ],
-      },
-
-      reviewer: {
-        name: "Trần Văn A",
-
-        role: "Quản lý SOC",
-
-        avatar:
-          "https://lh3.googleusercontent.com/aida-public/AB6AXuA2hOD2ai6ZAcHaRwwVMTFaZe4-ihmKeOTfmGE8eNUcW3jwr7MUOy6mvsXmA_kaKNClwhR0d7f1W3kVC3M-1twZfS2wIKgkB5_D0UKxoAvqXYETbrPu1L-4hdKiM3wVS3S9Juc7Oxd6XF57XT5_njBbmGdsvXC3-mTc1z_N18HT0ejboaPJQ60mqZ4MxYuzkYo0ep7H-kPpYGwv-Ar-Ktk1Xo_T-MSGDy7rXTcwbKXz4cruGtgAhJgfVnuH_x881xRVCtXbUnRpzhmi",
-
-        comment:
-          "Vui lòng cập nhật số điện thoại khẩn cấp. Nó đã thay đổi vào tháng trước.",
-
-        statusLabel: "Chờ Chỉnh Sửa",
-      },
-    },
-  },
-
-  "DOC-2024-042": {
-    preview: {
-      title: "Cloud Architecture Guideline",
-
-      description: "Tiêu chuẩn thiết kế hạ tầng Cloud cho các dự án nội bộ.",
-
-      content: (
-        <>
-          <h2 className="text-2xl font-headline font-semibold mt-8 mb-4">
-            1. Kiến Trúc Mạng
-          </h2>
-
-          <p>
-            Tất cả các dịch vụ nội bộ phải được đặt trong Private Subnet và giao
-            tiếp qua VPC Peering.
-          </p>
-
-          <ul className="list-disc pl-6 space-y-2 mt-4">
-            <li>Không mở public IP cho Database.</li>
-
-            <li>Sử dụng NAT Gateway cho các truy cập ra ngoài internet.</li>
-          </ul>
-        </>
-      ),
-    },
-
-    sidebar: {
-      id: "DOC-2024-042",
-
-      title: "Cloud Guideline",
-
-      status: "Pending",
-
-      version: "v1.0.5",
-
-      aiAssessment: {
-        score: "7.2",
-
-        label: "Cần Cải Thiện",
-
-        summary: "Thiếu phần cấu hình IAM Roles và bảo mật lưu trữ.",
-
-        points: [
-          {
-            isPositive: true,
-
-            text: "Kiến trúc mạng an toàn, tuân thủ AWS Well-Architected.",
-          },
-
-          {
-            isPositive: false,
-
-            text: "Thiếu hướng dẫn phân quyền IAM Role cho EKS.",
-          },
-        ],
-      },
-
-      reviewer: {
-        name: "Minh Tú",
-
-        role: "Cloud Architect",
-
-        avatar:
-          "https://lh3.googleusercontent.com/aida-public/AB6AXuA2hOD2ai6ZAcHaRwwVMTFaZe4-ihmKeOTfmGE8eNUcW3jwr7MUOy6mvsXmA_kaKNClwhR0d7f1W3kVC3M-1twZfS2wIKgkB5_D0UKxoAvqXYETbrPu1L-4hdKiM3wVS3S9Juc7Oxd6XF57XT5_njBbmGdsvXC3-mTc1z_N18HT0ejboaPJQ60mqZ4MxYuzkYo0ep7H-kPpYGwv-Ar-Ktk1Xo_T-MSGDy7rXTcwbKXz4cruGtgAhJgfVnuH_x881xRVCtXbUnRpzhmi",
-
-        comment:
-          "Vui lòng bổ sung phần IAM Roles và hướng dẫn bảo mật S3 Bucket.",
-
-        statusLabel: "Chờ Chỉnh Sửa",
-      },
-    },
-  },
-};
-
-// Hàm sinh dữ liệu dự phòng cho các ID không có sẵn trong Mock Data
-
-const getDocumentData = (id: string) => {
-  if (MOCK_DOCUMENTS[id]) return MOCK_DOCUMENTS[id];
-
-  // Dữ liệu Fallback
+  const reviews = doc.reviews ?? [];
+  const latestReview = reviews.length > 0 ? reviews[reviews.length - 1] : null;
 
   return {
-    preview: {
-      title: `Tài Liệu Cấu Hình ${id}`,
-
-      description: `Tài liệu tự động tạo để hiển thị cho ID: ${id}`,
-
-      content: (
-        <>
-          <h2 className="text-2xl font-headline font-semibold mt-8 mb-4">
-            Nội Dung Đang Cập Nhật
-          </h2>
-
-          <p>
-            Chưa có dữ liệu chi tiết cho tài liệu này trên hệ thống. Vui lòng
-            liên hệ người tạo tài liệu để biết thêm chi tiết.
-          </p>
-        </>
-      ),
+    id: doc.document_id ?? doc.id,
+    title: doc.title ?? doc.original_filename ?? "Untitled",
+    status: statusLabels[doc.status] ?? doc.status ?? "Draft",
+    version: `v${doc.version ?? 1}.0`,
+    aiAssessment: {
+      score: doc.is_vectorized ? "--" : "--",
+      label: doc.is_vectorized
+        ? t.documents.detail.vectorized
+        : t.documents.detail.notVectorized,
+      summary: doc.is_vectorized
+        ? t.documents.detail.vectorized
+        : t.documents.detail.notVectorized,
+      points: doc.is_vectorized
+        ? [{ isPositive: true, text: t.documents.detail.vectorized }]
+        : [],
     },
-
-    sidebar: {
-      id: id,
-
-      title: `Tài liệu ${id}`,
-
-      status: "Draft",
-
-      version: "v1.0.0",
-
-      aiAssessment: {
-        score: "--",
-
-        label: "Chưa Đánh Giá",
-
-        summary: "Tài liệu mới, AI Curator chưa tiến hành phân tích.",
-
-        points: [],
-      },
-
-      reviewer: null,
-    },
+    reviewer: latestReview
+      ? {
+          name: latestReview.reviewer_name ?? "Reviewer",
+          role: "Reviewer",
+          avatar: "",
+          comment: latestReview.comment ?? "",
+          statusLabel:
+            doc.status === "approved"
+              ? t.status.approved
+              : doc.status === "rejected"
+                ? t.status.rejected
+                : t.approvals.submitted,
+        }
+      : null,
   };
-};
-
-interface PageProps {
-  params: Promise<{ id: string }>;
 }
 
-export default async function DocumentDetailPage({ params }: PageProps) {
-  const resolvedParams = await params;
+export default function DocumentDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const resolvedParams = use(params);
   const documentId = resolvedParams.id;
-  const docData = getDocumentData(documentId);
+  const { t } = useTranslation();
 
-  // === GIẢ LẬP LOGIC PHÂN QUYỀN ===
-  // Trong thực tế, bạn sẽ lấy từ hook ở Client Component,
-  // hoặc check JWT/Session ở Server Component.
-  // Ví dụ: const perm = usePermission();
-  // let userRole = 'viewer';
-  // if (perm.canApprove) userRole = 'approver';
-  // else if (perm.canEdit) userRole = 'editor';
+  const { data: document, isLoading, error, refetch: refetchDoc } = useDocument(documentId);
+  const { data: vecStatus, refetch: refetchVecStatus } = useQuery({
+    queryKey: ["vectorization", "status", documentId],
+    queryFn: () => vectorizationApi.getStatus(documentId),
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      return data && !data.is_vectorized ? 5000 : false;
+    },
+    enabled: !!document,
+  });
 
-  const currentUserRole: "viewer" | "editor" | "approver" = "approver"; // Đổi giá trị này để test UI
+  const refetch = () => {
+    refetchDoc();
+    refetchVecStatus();
+  };
+
+  const perm = usePermission();
+  const approveMutation = useApproveDocument();
+  const rejectMutation = useRejectDocument();
+  const reviewMutation = useCreateReview(documentId);
+
+  const [pendingAction, setPendingAction] = useState<{
+    type: "approve" | "reject";
+    grade: number;
+    comment: string;
+  } | null>(null);
+
+  // New version upload state
+  const [isUploadingVersion, setIsUploadingVersion] = useState(false);
+  const [isExpiring, setIsExpiring] = useState(false);
+  const [isRevectorizing, setIsRevectorizing] = useState(false);
+  const [isDeletingVectors, setIsDeletingVectors] = useState(false);
+
+  const deriveRole = (): "viewer" | "editor" | "approver" => {
+    if (perm.canApprove) return "approver";
+    if (perm.canUpload) return "editor";
+    return "viewer";
+  };
+
+  const handleApprove = (grade: number, comment: string) => {
+    setPendingAction({ type: "approve", grade, comment });
+    approveMutation.mutate(documentId, {
+      onSuccess: () => {
+        toast.success(t.status.approved);
+        setPendingAction(null);
+        refetch();
+      },
+      onError: (err: any) => {
+        toast.error(err?.response?.data?.detail ?? t.errors.approveFailed);
+        setPendingAction(null);
+      },
+    });
+  };
+
+  const handleReject = (grade: number, comment: string) => {
+    setPendingAction({ type: "reject", grade, comment });
+    rejectMutation.mutate(
+      { id: documentId, reason: comment || "Not meeting requirements." },
+      {
+        onSuccess: () => {
+          toast.success(t.status.rejected);
+          setPendingAction(null);
+          refetch();
+        },
+        onError: (err: any) => {
+          toast.error(err?.response?.data?.detail ?? t.errors.rejectFailed);
+          setPendingAction(null);
+        },
+      }
+    );
+  };
+
+  const handleNewVersion = async (file: File) => {
+    setIsUploadingVersion(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      await apiClient.post(`/documents/${documentId}/new-version`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      toast.success(t.documents.uploadButton);
+      refetch();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail ?? t.errors.uploadFailed);
+    } finally {
+      setIsUploadingVersion(false);
+    }
+  };
+
+  const handleExpire = async () => {
+    setIsExpiring(true);
+    try {
+      await apiClient.post(`/documents/${documentId}/expire`);
+      toast.success(t.status.expired);
+      refetch();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail ?? t.errors.generic);
+    } finally {
+      setIsExpiring(false);
+    }
+  };
+
+  const handleRevectorize = async () => {
+    setIsRevectorizing(true);
+    try {
+      await vectorizationApi.vectorize(documentId, true);
+      toast.success(t.documents.detail.revectorize);
+      refetch();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail ?? t.errors.generic);
+    } finally {
+      setIsRevectorizing(false);
+    }
+  };
+
+  const handleDeleteVectors = async () => {
+    if (!confirm("Are you sure you want to delete the vectors for this document?")) return;
+    setIsDeletingVectors(true);
+    try {
+      await vectorizationApi.deleteVectors(documentId);
+      toast.success(t.documents.detail.deleteVectorsSuccess ?? "Vectors deleted successfully");
+      refetch();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail ?? t.errors.generic);
+    } finally {
+      setIsDeletingVectors(false);
+    }
+  };
+
+  // File input ref for new version
+  const triggerNewVersionUpload = () => {
+    const input = window.document.createElement("input");
+    input.type = "file";
+    input.accept = ".pdf,.doc,.docx";
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) handleNewVersion(file);
+    };
+    input.click();
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-8 flex items-center justify-center h-[calc(100vh-4rem)]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-tertiary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-on-surface-variant">{t.documents.detail.loading}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !document) {
+    return (
+      <div className="p-8 flex items-center justify-center h-[calc(100vh-4rem)]">
+        <div className="flex flex-col items-center gap-4 max-w-md text-center">
+          <span
+            className="material-symbols-outlined text-5xl text-error"
+            style={{ fontSize: "48px" }}
+          >
+            error
+          </span>
+          <h2 className="text-xl font-bold text-on-surface">{t.documents.detail.notFound}</h2>
+          <p className="text-sm text-on-surface-variant">
+            {t.documents.detail.notFoundDesc.replace("{id}", documentId)}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-tertiary text-on-tertiary rounded-lg font-semibold text-sm"
+          >
+            {t.common.retry}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const sidebarData = mapDocumentToSidebar(
+    { ...document, is_vectorized: vecStatus?.is_vectorized ?? document.is_vectorized },
+    t
+  );
+  const userRole = deriveRole();
+  const isPending = document.status === "pending_review";
+  const isApproved = document.status === "approved";
 
   return (
     <div className="p-8 flex gap-8 h-[calc(100vh-4rem)] overflow-hidden">
-      {/* Cột trái: Nội dung tài liệu */}
+      {/* Left: Document content */}
       <DocumentPreview
-        title={docData.preview.title}
-        description={docData.preview.description}
-        content={docData.preview.content}
+        title={document.title ?? document.original_filename ?? "Untitled"}
+        description={document.description ?? t.documents.detail.noDescription}
+        content={
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-3 text-sm text-on-surface-variant">
+              <span className="bg-surface-container-low px-3 py-1 rounded-full">
+                {t.documents.detail.typeLabel}: {document.document_type ?? "N/A"}
+              </span>
+              <span className="bg-surface-container-low px-3 py-1 rounded-full">
+                {t.documents.detail.fileLabel}: {document.original_filename ?? "N/A"}
+              </span>
+              <span className="bg-surface-container-low px-3 py-1 rounded-full">
+                {t.documents.detail.sizeLabel}:{" "}
+                {document.file_size != null
+                  ? `${(document.file_size / 1024).toFixed(1)} KB`
+                  : "N/A"}
+              </span>
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                  (vecStatus?.is_vectorized ?? document.is_vectorized)
+                    ? "bg-green-100 text-green-800"
+                    : "bg-yellow-100 text-yellow-800"
+                }`}
+              >
+                {(vecStatus?.is_vectorized ?? document.is_vectorized)
+                  ? t.documents.detail.vectorized
+                  : t.documents.detail.notVectorized}
+              </span>
+            </div>
+            {document.download_url && (
+              <div>
+                <a
+                  href={document.download_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 text-tertiary font-semibold text-sm hover:underline"
+                >
+                  <span className="material-symbols-outlined text-[18px]">download</span>
+                  {t.documents.detail.downloadOriginal}
+                </a>
+              </div>
+            )}
+            {!(vecStatus?.is_vectorized ?? document.is_vectorized) && isPending && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+                {t.documents.detail.notVectorizedNotice}
+              </div>
+            )}
+
+            {/* Additional actions */}
+            <div className="border-t border-surface-variant/30 pt-4 mt-4">
+              <div className="flex flex-wrap gap-2">
+                {userRole !== "viewer" && (
+                  <>
+                    <button
+                      onClick={triggerNewVersionUpload}
+                      disabled={isUploadingVersion}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-outline-variant/40 text-on-surface-variant hover:bg-surface-container-low transition-colors disabled:opacity-50"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">upload</span>
+                      {isUploadingVersion ? t.common.loading : t.documents.detail.newVersion}
+                    </button>
+                    <button
+                      onClick={handleExpire}
+                      disabled={isExpiring}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-outline-variant/40 text-on-surface-variant hover:bg-surface-container-low transition-colors disabled:opacity-50"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">timer_off</span>
+                      {isExpiring ? t.common.loading : t.documents.detail.expire}
+                    </button>
+                  </>
+                )}
+                {isApproved && (
+                  <button
+                    onClick={handleRevectorize}
+                    disabled={isRevectorizing}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-outline-variant/40 text-on-surface-variant hover:bg-surface-container-low transition-colors disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
+                    {isRevectorizing ? t.common.loading : t.documents.detail.revectorize}
+                  </button>
+                )}
+                {isApproved && (vecStatus?.is_vectorized ?? document.is_vectorized) && (
+                  <button
+                    onClick={handleDeleteVectors}
+                    disabled={isDeletingVectors}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-red-200 text-red-700 hover:bg-red-50 transition-colors disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                    {isDeletingVectors ? t.common.loading : t.documents.detail.deleteVectors}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        }
       />
 
-      {/* Cột phải: Sidebar phân quyền */}
+      {/* Right: Sidebar with approval workflow */}
       <DocumentSidebar
-        data={docData.sidebar}
-        userRole={currentUserRole} // Truyền Role vào đây
+        data={sidebarData}
+        userRole={userRole}
+        onApprove={handleApprove}
+        onReject={handleReject}
+        isApproving={approveMutation.isPending}
+        isRejecting={rejectMutation.isPending}
       />
     </div>
   );
