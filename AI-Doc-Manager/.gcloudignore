@@ -1,0 +1,59 @@
+# GCloud SDK ignore file
+# Prevents uploading these files/directories when using `gcloud builds submit`,
+# `gcloud run deploy --source`, or `gcloud storage cp`.
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / Frontend
+node_modules/
+.next/
+out/
+build/
+dist/
+.npm/
+
+# Environment files (may contain secrets)
+.env
+.env.*
+!.env.example
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Data directories (local dev only)
+postgres_data/
+minio_data/
+
+# Artifacts
+*.patch
+*.log
+.coverage
+coverage/
+htmlcov/
+
+# Docker
+# NOTE: only exclude Dockerfiles at the repository root.
+# backend/Dockerfile and frontend/Dockerfile are required by Cloud Build.
+/Dockerfile*
+/.dockerignore
+/docker-compose*.yml
