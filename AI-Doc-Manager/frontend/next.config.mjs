@@ -9,7 +9,9 @@ const nextConfig = {
       {
         protocol: "https",
         hostname: "storage.googleapis.com",
-        pathname: `/${process.env.GCS_BUCKET_NAME}/**`,
+        // Use the NEXT_PUBLIC_ prefixed var (set via Dockerfile build arg)
+        // with a fallback to the unprefixed name for backward compatibility.
+        pathname: `/${process.env.NEXT_PUBLIC_GCS_BUCKET_NAME || process.env.GCS_BUCKET_NAME || ""}/**`,
       },
     ],
   },
@@ -23,7 +25,7 @@ const nextConfig = {
       process.env.BACKEND_URL ||
       (process.env.NODE_ENV === "development"
         ? "http://localhost:8000"
-        : "http://backend:8000");
+        : "http://backend:8080");
 
     return [
       {
@@ -60,8 +62,10 @@ const nextConfig = {
 
   // Env vars exposed to browser
   env: {
-    NEXT_PUBLIC_GCS_BUCKET_NAME: process.env.GCS_BUCKET_NAME ?? "",
-    NEXT_PUBLIC_GCP_PROJECT_ID: process.env.GCP_PROJECT_ID ?? "",
+    // Use the NEXT_PUBLIC_ prefixed var (set via Dockerfile build arg)
+    // with a fallback to the unprefixed name for backward compatibility.
+    NEXT_PUBLIC_GCS_BUCKET_NAME: process.env.NEXT_PUBLIC_GCS_BUCKET_NAME ?? process.env.GCS_BUCKET_NAME ?? "",
+    NEXT_PUBLIC_GCP_PROJECT_ID: process.env.NEXT_PUBLIC_GCP_PROJECT_ID ?? process.env.GCP_PROJECT_ID ?? "",
   },
 };
 

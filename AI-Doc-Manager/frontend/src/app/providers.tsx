@@ -1,40 +1,40 @@
-"use client"
+"use client";
 
-import { useEffect } from "react"
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { useState } from "react"
-import { Toaster } from "sonner"
-import { authApi } from "@/lib/api/auth"
-import { clearStoredAccessToken, getStoredAccessToken } from "@/lib/api/authToken"
-import { useAuthStore } from "@/stores/authStore"
+import { useEffect, useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "sonner";
+import { authApi } from "@/lib/api/auth";
+import { clearStoredAccessToken, getStoredAccessToken } from "@/lib/api/authToken";
+import { useAuthStore } from "@/stores/authStore";
+import { LanguageProvider } from "@/i18n/LanguageContext";
 
 function BackendSessionSync() {
-  const setUser = useAuthStore((s) => s.setUser)
-  const logout  = useAuthStore((s) => s.logout)
+  const setUser = useAuthStore((s) => s.setUser);
+  const logout = useAuthStore((s) => s.logout);
 
   useEffect(() => {
     const syncSession = async () => {
       if (!getStoredAccessToken()) {
-        logout()
-        return
+        logout();
+        return;
       }
 
-      const storeUser = useAuthStore.getState().user
+      const storeUser = useAuthStore.getState().user;
       if (!storeUser) {
         try {
-          const me = await authApi.me()
-          setUser(me)
+          const me = await authApi.me();
+          setUser(me);
         } catch {
-          clearStoredAccessToken()
-          logout()
+          clearStoredAccessToken();
+          logout();
         }
       }
-    }
+    };
 
-    void syncSession()
-  }, [setUser, logout])
+    void syncSession();
+  }, [setUser, logout]);
 
-  return null
+  return null;
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -43,19 +43,21 @@ export function Providers({ children }: { children: React.ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime:            60_000,
-            retry:                1,
+            staleTime: 60_000,
+            retry: 1,
             refetchOnWindowFocus: false,
           },
         },
       }),
-  )
+  );
 
   return (
     <QueryClientProvider client={queryClient}>
-      <BackendSessionSync />
-      {children}
-      <Toaster richColors position="top-right" />
+      <LanguageProvider>
+        <BackendSessionSync />
+        {children}
+        <Toaster richColors position="top-right" />
+      </LanguageProvider>
     </QueryClientProvider>
-  )
+  );
 }

@@ -11,14 +11,14 @@ export default function MainLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const router = useRouter();
 
   useEffect(() => {
-    if (!isAuthenticated()) router.replace("/login");
-  }, [isAuthenticated, router]);
+    if (!user) router.replace("/login");
+  }, [user, router]);
 
-  if (!isAuthenticated()) return null;
+  if (!user) return null;
 
   return (
     <div className="flex h-[100vh] w-[100vw] overflow-hidden">

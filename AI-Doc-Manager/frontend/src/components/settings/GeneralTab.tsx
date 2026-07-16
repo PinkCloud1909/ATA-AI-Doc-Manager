@@ -1,25 +1,26 @@
 "use client";
 import { useState } from "react";
+import { useTranslation } from "@/i18n/LanguageContext";
 
 export default function GeneralTab() {
+  const { t, language, setLanguage } = useTranslation();
   const [theme, setTheme] = useState("light");
   const [autoGrade, setAutoGrade] = useState(true);
-  const [language, setLanguage] = useState("vi");
 
   return (
     <div className="max-w-2xl animate-in fade-in duration-300">
       <h3 className="font-headline font-bold text-2xl text-on-surface mb-8">
-        Chung
+        {t.settings.general}
       </h3>
 
       <div className="space-y-10">
-        {/* Section: Giao diện */}
+        {/* Section: Theme */}
         <section>
           <h4 className="font-inter text-sm font-semibold text-on-surface uppercase tracking-wider mb-4">
-            Giao diện
+            {t.settings.theme}
           </h4>
           <div className="flex items-center gap-4">
-            {/* Option Sáng */}
+            {/* Light Option */}
             <label className="flex flex-col items-center gap-3 cursor-pointer group">
               <div
                 className={`w-32 h-20 rounded-lg border-2 flex flex-col p-2 gap-1 shadow-sm transition-all bg-background ${theme === "light" ? "border-tertiary" : "border-transparent hover:border-outline-variant"}`}
@@ -39,12 +40,12 @@ export default function GeneralTab() {
                 <span
                   className={`font-inter text-sm font-medium ${theme === "light" ? "text-on-surface" : "text-on-surface-variant group-hover:text-on-surface"}`}
                 >
-                  Sáng
+                  {t.settings.themeLight}
                 </span>
               </div>
             </label>
 
-            {/* Option Tối */}
+            {/* Dark Option */}
             <label className="flex flex-col items-center gap-3 cursor-pointer group">
               <div
                 className={`w-32 h-20 rounded-lg border-2 flex flex-col p-2 gap-1 transition-all bg-inverse-surface ${theme === "dark" ? "border-tertiary" : "border-transparent hover:border-outline-variant"}`}
@@ -64,7 +65,7 @@ export default function GeneralTab() {
                 <span
                   className={`font-inter text-sm font-medium ${theme === "dark" ? "text-on-surface" : "text-on-surface-variant group-hover:text-on-surface"}`}
                 >
-                  Tối
+                  {t.settings.themeDark}
                 </span>
               </div>
             </label>
@@ -73,14 +74,14 @@ export default function GeneralTab() {
 
         <div className="h-px w-full bg-surface-variant/50"></div>
 
-        {/* Section: Tự động chấm điểm */}
+        {/* Section: Auto Grade */}
         <section className="flex items-center justify-between">
           <div>
             <h4 className="font-inter text-base font-semibold text-on-surface">
-              Tự động chấm điểm tài liệu
+              {t.settings.autoGrade}
             </h4>
             <p className="font-inter text-sm text-on-surface-variant mt-1">
-              AI sẽ tự động đánh giá và chấm điểm các tài liệu được tải lên.
+              {t.settings.autoGradeDesc}
             </p>
           </div>
           <label className="relative inline-flex items-center cursor-pointer">
@@ -96,25 +97,34 @@ export default function GeneralTab() {
 
         <div className="h-px w-full bg-surface-variant/50"></div>
 
-        {/* Section: Ngôn ngữ */}
+        {/* Section: Language */}
         <section>
           <h4 className="font-inter text-sm font-semibold text-on-surface uppercase tracking-wider mb-4">
-            Ngôn ngữ
+            {t.settings.language}
           </h4>
-          <div className="relative w-64">
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              className="block w-full appearance-none bg-surface-container-low border border-transparent text-on-surface font-inter text-sm rounded-lg px-4 py-2.5 pr-8 focus:outline-none focus:ring-2 focus:ring-tertiary focus:bg-surface-container-lowest transition-colors cursor-pointer"
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setLanguage("vi")}
+              className={`px-6 py-2.5 rounded-lg font-inter text-sm font-semibold border-2 transition-all ${
+                language === "vi"
+                  ? "border-tertiary bg-tertiary-container/20 text-tertiary"
+                  : "border-transparent bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
+              }`}
             >
-              <option value="vi">Tiếng Việt</option>
-              <option value="en">Tiếng Anh</option>
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-on-surface-variant">
-              <span className="material-symbols-outlined text-xl">
-                expand_more
-              </span>
-            </div>
+              {t.settings.languageVietnamese}
+            </button>
+            <button
+              type="button"
+              onClick={() => setLanguage("en")}
+              className={`px-6 py-2.5 rounded-lg font-inter text-sm font-semibold border-2 transition-all ${
+                language === "en"
+                  ? "border-tertiary bg-tertiary-container/20 text-tertiary"
+                  : "border-transparent bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
+              }`}
+            >
+              {t.settings.languageEnglish}
+            </button>
           </div>
         </section>
       </div>

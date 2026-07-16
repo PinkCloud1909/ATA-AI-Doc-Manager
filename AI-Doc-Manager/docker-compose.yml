@@ -1,4 +1,27 @@
 services:
+  # ── Database migrations (run-once) ────────────────────────────────────
+  # Applies pending Alembic migrations and seeds bootstrap IAM data.
+  # This mirrors the production pattern where migrations run as a Cloud Run
+  # Job or CI/CD step, never as part of the API server startup.
+  db-migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ai-doc-migrate
+    env_file:
+      - .env
+      - ./backend/.env
+    environment:
+      ENVIRONMENT: local
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      ASYNC_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app-network
+    command: python scripts/run_migrations.py
+
   backend:
     build:
       context: ./backend
@@ -11,23 +34,20 @@ services:
       ENVIRONMENT: local
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       ASYNC_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      GCP_PROJECT_ID: ${GCP_PROJECT_ID}
+      GCS_BUCKET_NAME: ${GCS_BUCKET_NAME}
+      GOOGLE_APPLICATION_CREDENTIALS: /gcp/adc.json
     depends_on:
       postgres:
         condition: service_healthy
-      minio:
-        condition: service_started
-      minio-init:
+      db-migrate:
         condition: service_completed_successfully
     ports:
       # Host port 8000 → container port 8080 (Dockerfile default PORT=8080).
       - "8000:8080"
-    command: >
-      sh -c "alembic upgrade head &&
-      python scripts/seed.py &&
-      uvicorn app.main:app --host 0.0.0.0 --port 8080"
+    volumes:
+      # Mount Application Default Credentials so local dev uses real GCS.
+      - ${GOOGLE_APPLICATION_CREDENTIALS:-~/.config/gcloud/application_default_credentials.json}:/gcp/adc.json:ro
     networks:
       - app-network
     healthcheck:
@@ -36,7 +56,7 @@ services:
           "CMD",
           "python",
           "-c",
-          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5).read()",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=5).read()",
         ]
       interval: 10s
       timeout: 5s
@@ -47,14 +67,14 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        BACKEND_URL: http://backend:8000
+        BACKEND_URL: http://backend:8080
         NEXT_PUBLIC_API_URL: /api/v1
         NEXT_PUBLIC_USE_MOCK: "false"
     container_name: ai-doc-frontend
     env_file:
       - .env
     environment:
-      BACKEND_URL: http://backend:8000
+      BACKEND_URL: http://backend:8080
       NEXT_PUBLIC_API_URL: /api/v1
       NEXT_PUBLIC_USE_MOCK: "false"
     depends_on:
@@ -84,43 +104,8 @@ services:
       timeout: 5s
       retries: 10
 
-  minio:
-    image: minio/minio:latest
-    container_name: ai-doc-minio
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - minio_data:/data
-    networks:
-      - app-network
-    command: server /data --console-address ":9001"
-
-  minio-init:
-    image: minio/mc:latest
-    container_name: ai-doc-minio-init
-    env_file:
-      - .env
-    depends_on:
-      - minio
-    networks:
-      - app-network
-    entrypoint: >
-      /bin/sh -c "
-      until /usr/bin/mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD; do
-        echo 'Waiting for MinIO...';
-        sleep 2;
-      done;
-      /usr/bin/mc mb --ignore-existing local/$$MINIO_BUCKET;
-      exit 0;
-      "
-
 volumes:
   postgres_data:
-  minio_data:
 
 networks:
   app-network:

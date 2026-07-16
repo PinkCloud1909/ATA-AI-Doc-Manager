@@ -3,7 +3,6 @@ from datetime import datetime
 
 from sqlalchemy import (
     BigInteger,
-    Boolean,
     DateTime,
     Enum,
     ForeignKey,
@@ -16,6 +15,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
+from app.modules.rag.domain.enums import RagIngestionStatus
 from app.shared.enums import DocumentType, Status, enum_values
 
 document_type_enum = Enum(
@@ -26,6 +26,11 @@ document_type_enum = Enum(
 status_enum = Enum(
     Status,
     name="status_enum",
+    values_callable=enum_values,
+)
+rag_ingestion_status_enum = Enum(
+    RagIngestionStatus,
+    name="rag_ingestion_status_enum",
     values_callable=enum_values,
 )
 
@@ -53,7 +58,17 @@ class Document(Base):
     file_link: Mapped[str] = mapped_column(String(500), nullable=False)
     file_size: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     content_type: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    is_vectorized: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    rag_ingestion_status: Mapped[RagIngestionStatus] = mapped_column(
+        rag_ingestion_status_enum,
+        nullable=False,
+        default=RagIngestionStatus.NOT_INGESTED,
+        server_default=RagIngestionStatus.NOT_INGESTED.value,
+    )
+    rag_ingestion_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rag_ingested_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=False),
+        nullable=True,
+    )
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         Uuid,
         ForeignKey("users.id"),
@@ -105,6 +120,11 @@ class Document(Base):
         DateTime(timezone=False),
         nullable=True,
     )
+
+    @property
+    def is_rag_ingested(self) -> bool:
+        """True when the document has been successfully ingested into the RAG corpus."""
+        return self.rag_ingestion_status == RagIngestionStatus.COMPLETED
 
     creator: Mapped["User | None"] = relationship(
         back_populates="created_documents",

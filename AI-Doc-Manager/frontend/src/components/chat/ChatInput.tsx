@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, KeyboardEvent } from "react";
+import { useTranslation } from "@/i18n/LanguageContext";
 
 interface ChatInputProps {
   onSendMessage: (text: string) => void;
@@ -11,6 +12,7 @@ export default function ChatInput({
   onSendMessage,
   disabled = false,
 }: ChatInputProps) {
+  const { t } = useTranslation();
   const [text, setText] = useState("");
   const [isRecording, setIsRecording] = useState(false);
 
@@ -57,10 +59,10 @@ export default function ChatInput({
             className="w-full bg-transparent border-none focus:ring-0 text-on-surface placeholder:text-on-surface-variant/50 px-4 py-3 pr-24 resize-none min-h-[56px] custom-scrollbar"
             placeholder={
               disabled
-                ? "AI đang trả lời..."
+                ? t.chat.aiResponding
                 : isRecording
-                  ? "Đang nghe..."
-                  : "Hỏi AI về tài liệu hoặc yêu cầu chấm điểm (Nhấn Enter để gửi)..."
+                  ? t.chat.listening
+                  : t.chat.inputPlaceholder
             }
             rows={1}
           />
@@ -90,8 +92,7 @@ export default function ChatInput({
         </div>
         <div className="flex justify-center mt-3">
           <p className="text-[10px] text-on-surface-variant/60 font-medium">
-            Architect AI có thể mắc lỗi. Vui lòng kiểm tra lại các thông tin
-            quan trọng.
+            {t.chat.disclaimer}
           </p>
         </div>
       </div>

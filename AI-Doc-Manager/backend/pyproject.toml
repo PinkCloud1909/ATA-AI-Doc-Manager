@@ -8,32 +8,36 @@ version = "0.1.0"
 description = "Minimal FastAPI backend foundation for a document management system."
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = [
-  "alembic>=1.14.0",
-  "asyncpg>=0.29.0",
-  "chromadb>=0.5.0",
-  "fastapi>=0.115.0",
-  "google-adk>=1.32.0",
-  "google-cloud-aiplatform>=1.150.0",
-  "google-cloud-storage>=3.0.0",
-  "google-cloud-tasks>=2.16.0",
-  "google-genai>=1.75.0",
-  "minio>=7.2.8",
-  "passlib>=1.7.4",
-  "psycopg[binary]>=3.2.0",
-  "pydantic-settings>=2.6.0",
-  "PyJWT>=2.9.0",
-  "PyMuPDF>=1.24.0",
-  "python-docx>=1.1.0",
-  "python-multipart>=0.0.9",
-  "sqlalchemy>=2.0.36,<2.1.0",
-  "uvicorn[standard]>=0.32.0,<1.0.0",
-]
 
-[project.optional-dependencies]
-dev = [
-  "httpx>=0.28.0,<1.0.0",
-  "pytest>=8.3.0,<9.0.0",
+dependencies = [
+  "alembic>=1.14,<2",
+  "asyncpg>=0.29,<1",
+  "bcrypt>=4,<5",
+  "cloud-sql-python-connector>=1.20,<2",
+
+  "fastapi>=0.115,<1",
+
+  "google-adk>=2,<3",
+  "google-cloud-aiplatform>=1,<2",
+  "google-cloud-documentai>=3,<4",
+  "google-cloud-error-reporting>=1,<2",
+  "google-cloud-logging>=3,<4",
+  "google-cloud-secret-manager>=2,<3",
+  "google-cloud-storage>=3,<4",
+  "google-cloud-tasks>=2,<3",
+  "google-genai>=2,<3",
+
+  "psycopg[binary]>=3,<4",
+
+  "pydantic-settings>=2,<3",
+
+  "PyJWT>=2,<3",
+
+  "python-multipart>=0.0,<1",
+
+  "sqlalchemy>=2,<3",
+
+  "uvicorn[standard]>=0.49,<1",
 ]
 
 [tool.setuptools.packages.find]
@@ -44,3 +48,10 @@ addopts = "-p no:cacheprovider"
 norecursedirs = [".pytest_cache", "pytest-cache-files-*"]
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+  "httpx>=0.28,<1",
+  "pytest>=8,<10",
+  "pytest-asyncio>=1,<2",
+]

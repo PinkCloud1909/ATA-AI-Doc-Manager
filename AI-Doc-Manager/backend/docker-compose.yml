@@ -1,4 +1,19 @@
 services:
+  # ── Database migrations (run-once) ────────────────────────────────────
+  db-migrate:
+    build:
+      context: .
+    env_file:
+      - .env
+    environment:
+      ENVIRONMENT: local
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      ASYNC_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: python scripts/run_migrations.py
+
   api:
     build:
       context: .
@@ -9,26 +24,20 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       ASYNC_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       GOOGLE_API_KEY: ${GOOGLE_API_KEY}
-      MINIO_ENDPOINT: minio:9000
-      MINIO_EXTERNAL_ENDPOINT: ${MINIO_EXTERNAL_ENDPOINT:-localhost:9000}
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
-      # ChromaDB persistence path — must match the volume mount below.
-      CHROMA_PERSIST_PATH: /app/.chroma_data
-    volumes:
-      - chroma_data:/app/.chroma_data
+      GCP_PROJECT_ID: ${GCP_PROJECT_ID}
+      GCS_BUCKET_NAME: ${GCS_BUCKET_NAME}
+      GOOGLE_APPLICATION_CREDENTIALS: /gcp/adc.json
     depends_on:
       postgres:
         condition: service_healthy
-      minio:
-        condition: service_started
+      db-migrate:
+        condition: service_completed_successfully
     ports:
       # Host port 8000 → container port 8080 (Dockerfile default PORT=8080).
       - "8000:8080"
-    command: >
-      sh -c "alembic upgrade head &&
-      python scripts/seed.py &&
-      uvicorn app.main:app --host 0.0.0.0 --port 8080"
+    volumes:
+      # Mount Application Default Credentials so local dev uses real GCS.
+      - ${GOOGLE_APPLICATION_CREDENTIALS:-~/.config/gcloud/application_default_credentials.json}:/gcp/adc.json:ro
 
   postgres:
     image: postgres:16-alpine
@@ -46,36 +55,5 @@ services:
       timeout: 5s
       retries: 10
 
-  minio:
-    image: minio/minio:latest
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - minio_data:/data
-    command: server /data --console-address ":9001"
-
-  minio-init:
-    image: minio/mc:latest
-    env_file:
-      - .env
-    depends_on:
-      - minio
-    entrypoint: >
-      /bin/sh -c "
-      until /usr/bin/mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD; do
-        echo 'waiting for minio';
-        sleep 2;
-      done;
-      /usr/bin/mc mb --ignore-existing local/$$MINIO_BUCKET;
-      exit 0;
-      "
-
 volumes:
   postgres_data:
-  minio_data:
-  # Named volume for ChromaDB vector store — prevents data loss on container restart.
-  chroma_data:

@@ -18,7 +18,7 @@ ARG BACKEND_URL
 ENV BACKEND_URL=$BACKEND_URL
 
 # Build-time env vars public, được bake vào bundle Next.js
-ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_API_URL=/api/v1
 ARG NEXT_PUBLIC_FIREBASE_API_KEY
 ARG NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
 ARG NEXT_PUBLIC_FIREBASE_PROJECT_ID
@@ -47,15 +47,17 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=8080
-ENV HOSTNAME=0.0.0.0
 
-# Giữ lại BACKEND_URL ở runtime cũng được, không hại
-ARG BACKEND_URL
-ENV BACKEND_URL=$BACKEND_URL
+# BACKEND_URL is injected at runtime by Cloud Run (--set-env-vars).
+# Do NOT set it here — an empty build arg would override the runtime value.
+# The build stage (builder) already baked the correct URL into the standalone
+# output via the --build-arg passed during docker build.
 
 COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static     ./.next/static
-COPY --from=builder /app/public           ./public
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+
+USER node
 
 EXPOSE 8080
 

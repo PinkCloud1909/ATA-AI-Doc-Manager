@@ -1,9 +1,9 @@
-import io
 import logging
-from typing import Annotated
+import tempfile
+from typing import Annotated, BinaryIO
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -36,14 +36,20 @@ from app.modules.documents.application.services import (
     update_document_metadata,
 )
 from app.shared.adapters.factory import (
-    get_llm_provider,
     get_object_storage,
-    get_vector_store,
+    get_rag_engine,
 )
-from app.shared.interfaces import ILLMProvider, IObjectStorage, IVectorStore
+from app.shared.interfaces import IObjectStorage, IRagEngine
 from app.modules.iam.domain.principal import AuthenticatedUser
 from app.modules.iam.domain.permissions import get_allowed_statuses
 from app.shared.enums import DocumentType, Status
+from app.shared.openapi_helpers import (
+    DELETE_RESPONSES,
+    LIST_RESPONSES,
+    MUTATE_RESPONSES,
+    RESPONSE_DESCRIPTIONS,
+)
+from app.shared.task_publisher import enqueue_rag_ingestion_task, is_async_mode
 
 logger = logging.getLogger(__name__)
 
@@ -55,12 +61,8 @@ def _get_storage() -> IObjectStorage:
     return get_object_storage()
 
 
-def _get_vectors() -> IVectorStore:
-    return get_vector_store()
-
-
-def _get_llm() -> ILLMProvider:
-    return get_llm_provider()
+def _get_rag_engine_dep() -> IRagEngine:
+    return get_rag_engine()
 
 
 def _build_action_response(document) -> DocumentActionResponse:
@@ -83,64 +85,20 @@ def _build_action_response(document) -> DocumentActionResponse:
 def _read_upload_chunked(
     file: UploadFile,
     max_bytes: int,
-) -> tuple[io.BytesIO, int]:
-    """Read an uploaded file in 64 KB chunks, enforcing the size limit early.
-
-    Raises ``ValidationError`` as soon as the accumulated bytes exceed
-    *max_bytes*, without reading the remainder of the stream.  Returns a
-    ``BytesIO`` seeked to position 0 ready for upload, and the exact byte count.
-    """
-    _CHUNK = 64 * 1024  # 64 KB per read
-    chunks: list[bytes] = []
+) -> tuple[BinaryIO, int]:
+    """Read an upload once, enforcing the size limit early."""
+    _CHUNK = 64 * 1024
     total = 0
     max_mb = max_bytes // (1024 * 1024)
-    while True:
-        chunk = file.file.read(_CHUNK)
-        if not chunk:
-            break
+    buffer = tempfile.SpooledTemporaryFile(max_size=max_bytes)
+    while chunk := file.file.read(_CHUNK):
         total += len(chunk)
         if total > max_bytes:
+            buffer.close()
             raise ValidationError(f"File size exceeds maximum of {max_mb} MB")
-        chunks.append(chunk)
-    return io.BytesIO(b"".join(chunks)), total
-
-
-def _background_vectorize(document_id: UUID) -> None:
-    """Background task: run vectorization pipeline for an approved document.
-
-    Creates its own DB session via session_scope() to avoid sharing a session
-    across threads. Errors are logged but do NOT affect the HTTP response.
-    """
-    from app.core.db import session_scope
-    from app.modules.vectorization.application.services import vectorize_document
-    from app.shared.adapters.factory import (
-        get_llm_provider as _llm,
-        get_object_storage as _storage,
-        get_vector_store as _vectors,
-    )
-
-    with session_scope() as session:
-        try:
-            result = vectorize_document(
-                session,
-                document_id=document_id,
-                storage=_storage(),
-                llm_provider=_llm(),
-                vector_store=_vectors(),
-            )
-            logger.info(
-                "background_vectorize_success",
-                extra={
-                    "document_id": str(document_id),
-                    "chunk_count": result.chunk_count,
-                    "processing_time_ms": result.processing_time_ms,
-                },
-            )
-        except Exception as exc:
-            logger.error(
-                "background_vectorize_failed",
-                extra={"document_id": str(document_id), "error": str(exc)},
-            )
+        buffer.write(chunk)
+    buffer.seek(0)
+    return buffer, total
 
 
 # --- Document CRUD ---
@@ -150,6 +108,20 @@ def _background_vectorize(document_id: UUID) -> None:
     "/upload",
     response_model=DocumentUploadResponse,
     status_code=status.HTTP_201_CREATED,
+    summary="Upload a new document",
+    description=(
+        "Upload a document file to the system.  The file is stored in object "
+        "storage (Google Cloud Storage) and metadata is "
+        "recorded in the database.\n\n"
+        "**Supported formats**: PDF, DOCX, TXT, and common image formats.\n\n"
+        "- `title` and `description` are optional — title defaults to the original filename.\n"
+        "- `document_type` defaults to `other` if not specified."
+    ),
+    response_description="Metadata for the newly uploaded document",
+    responses={
+        413: {"description": RESPONSE_DESCRIPTIONS[413]},
+        **MUTATE_RESPONSES,
+    },
 )
 def upload_document(
     current_user: Annotated[AuthenticatedUser, Depends(require_permission())],
@@ -169,13 +141,15 @@ def upload_document(
     resolved_title = title or original_filename
 
     object_key = storage.build_object_key(original_filename)
-    storage.ensure_bucket()
-    file_link = storage.upload_fileobj(
-        file_obj=file_buf,
-        object_key=object_key,
-        content_type=file.content_type,
-        length=file_size,
-    )
+    try:
+        file_link = storage.upload_fileobj(
+            file_obj=file_buf,
+            object_key=object_key,
+            content_type=file.content_type,
+            length=file_size,
+        )
+    finally:
+        file_buf.close()
 
     document = create_document(
         session,
@@ -208,6 +182,17 @@ def upload_document(
     "",
     response_model=DocumentListResponse,
     status_code=status.HTTP_200_OK,
+    summary="List documents",
+    description=(
+        "Returns a paginated, filterable list of documents scoped to the "
+        "authenticated user's role-based visibility.\n\n"
+        "- **status_filter**: Restrict to documents in a specific lifecycle status.\n"
+        "- **document_type**: Filter by document category (policy, manual, report, other).\n"
+        "- **created_by**: Filter by the UUID of the document creator.\n"
+        "- **page** / **page_size**: Control pagination (max 100 per page)."
+    ),
+    response_description="Paginated list of document summaries",
+    responses=LIST_RESPONSES,
 )
 def list_documents_route(
     current_user: Annotated[AuthenticatedUser, Depends(require_permission())],
@@ -262,6 +247,17 @@ def list_documents_route(
     "/{document_id}",
     response_model=DocumentDetailResponse,
     status_code=status.HTTP_200_OK,
+    summary="Get document details",
+    description=(
+        "Returns full document metadata including its workflow history "
+        "(who submitted, approved, or rejected it and when) and a "
+        "time-limited presigned download URL for the file contents."
+    ),
+    response_description="Full document details with download URL",
+    responses={
+        404: {"description": RESPONSE_DESCRIPTIONS[404]},
+        **MUTATE_RESPONSES,
+    },
 )
 def get_document(
     document_id: UUID,
@@ -282,7 +278,9 @@ def get_document(
         file_size=document.file_size,
         content_type=document.content_type,
         download_url=download_url,
-        is_vectorized=document.is_vectorized,
+        rag_ingestion_status=document.rag_ingestion_status.value,
+        rag_ingestion_error=document.rag_ingestion_error,
+        rag_ingested_at=document.rag_ingested_at,
         created_by=document.created_by,
         created_at=document.created_at,
         modified_by=document.modified_by,
@@ -301,6 +299,16 @@ def get_document(
     "/{document_id}",
     response_model=DocumentUploadResponse,
     status_code=status.HTTP_200_OK,
+    summary="Update document metadata",
+    description=(
+        "Update the title, description, or document type of an existing document.  "
+        "Only the fields provided are changed — omitted fields keep their current values."
+    ),
+    response_description="Updated document metadata",
+    responses={
+        404: {"description": RESPONSE_DESCRIPTIONS[404]},
+        **MUTATE_RESPONSES,
+    },
 )
 def update_document(
     document_id: UUID,
@@ -335,6 +343,17 @@ def update_document(
     "/{document_id}",
     response_model=DocumentDeleteResponse,
     status_code=status.HTTP_200_OK,
+    summary="Archive a document (soft delete)",
+    description=(
+        "Archives a document by setting its status to `archived`.  "
+        "The document and its file are retained but hidden from normal listings.  "
+        "Use `/permanent` to fully delete."
+    ),
+    response_description="Confirmation that the document was archived",
+    responses={
+        404: {"description": RESPONSE_DESCRIPTIONS[404]},
+        **DELETE_RESPONSES,
+    },
 )
 def soft_delete_document(
     document_id: UUID,
@@ -352,19 +371,29 @@ def soft_delete_document(
     "/{document_id}/permanent",
     response_model=DocumentDeleteResponse,
     status_code=status.HTTP_200_OK,
+    summary="Permanently delete a document",
+    description=(
+        "Irreversibly deletes a document, its stored file, and all associated "
+        "vector embeddings.  This action cannot be undone."
+    ),
+    response_description="Confirmation that the document was permanently deleted",
+    responses={
+        404: {"description": RESPONSE_DESCRIPTIONS[404]},
+        **DELETE_RESPONSES,
+    },
 )
 def hard_delete_document(
     document_id: UUID,
     current_user: Annotated[AuthenticatedUser, Depends(require_permission())],
     session: Annotated[Session, Depends(get_db_session)],
     storage: Annotated[IObjectStorage, Depends(_get_storage)],
-    vectors: Annotated[IVectorStore, Depends(_get_vectors)],
+    rag_engine: Annotated[IRagEngine, Depends(_get_rag_engine_dep)],
 ) -> DocumentDeleteResponse:
     delete_document_permanently(
         session,
         document_id=document_id,
-        minio_adapter=storage,
-        vector_store=vectors,
+        storage=storage,
+        rag_engine=rag_engine,
     )
     return DocumentDeleteResponse(
         detail="Document permanently deleted",
@@ -376,6 +405,18 @@ def hard_delete_document(
     "/{document_id}/new-version",
     response_model=DocumentUploadResponse,
     status_code=status.HTTP_201_CREATED,
+    summary="Create a new version of a document",
+    description=(
+        "Uploads a new file as the next version of an existing document.  "
+        "The version number is automatically incremented.  "
+        "The new version starts in `draft` status."
+    ),
+    response_description="Metadata for the newly created version",
+    responses={
+        404: {"description": RESPONSE_DESCRIPTIONS[404]},
+        413: {"description": RESPONSE_DESCRIPTIONS[413]},
+        **MUTATE_RESPONSES,
+    },
 )
 def new_version_document(
     document_id: UUID,
@@ -393,7 +434,6 @@ def new_version_document(
 
     original_filename = file.filename or "upload"
     object_key = storage.build_object_key(original_filename)
-    storage.ensure_bucket()
     file_link = storage.upload_fileobj(
         file_obj=file_buf,
         object_key=object_key,
@@ -434,6 +474,17 @@ def new_version_document(
     "/{document_id}/submit",
     response_model=DocumentActionResponse,
     status_code=status.HTTP_200_OK,
+    summary="Submit a document for review",
+    description=(
+        "Transitions a document from `draft` to `pending_review` status.  "
+        "The document then appears in the approvals queue for reviewers to act on."
+    ),
+    response_description="The document's updated workflow status",
+    responses={
+        404: {"description": RESPONSE_DESCRIPTIONS[404]},
+        409: {"description": "Document is not in a state that allows submission (must be 'draft')"},
+        **MUTATE_RESPONSES,
+    },
 )
 def submit_document(
     document_id: UUID,
@@ -452,29 +503,101 @@ def submit_document(
     "/{document_id}/approve",
     response_model=DocumentActionResponse,
     status_code=status.HTTP_200_OK,
-    summary="Approve a document and trigger background vectorization",
+    summary="Approve a document and trigger RAG ingestion",
+    description=(
+        "Approves a submitted document and triggers RAG Engine ingestion for semantic search.\n\n"
+        "- **Production** (ENVIRONMENT=production + CLOUD_TASKS_QUEUE_NAME set): "
+        "Enqueues a Cloud Tasks task to ingest asynchronously and returns 200 immediately.\n"
+        "- **Local / dev**: Runs ingestion synchronously — RAG Engine handles "
+        "parsing/chunking/embedding server-side, so the request completes in seconds.\n\n"
+        "If ingestion fails, the document remains approved and a 500 is returned.  "
+        "The client can manually retry via `POST /api/v1/rag/{document_id}`."
+    ),
+    response_description="The document's updated workflow status after approval",
+    responses={
+        404: {"description": RESPONSE_DESCRIPTIONS[404]},
+        409: {"description": "Document is not in 'pending_review' status"},
+        500: {"description": "Document approved but RAG ingestion failed"},
+        **MUTATE_RESPONSES,
+    },
 )
 def approve_document_route(
     document_id: UUID,
-    background_tasks: BackgroundTasks,
     current_user: Annotated[AuthenticatedUser, Depends(require_permission())],
     session: Annotated[Session, Depends(get_db_session)],
 ) -> DocumentActionResponse:
-    """Approve the document (synchronous) then schedule vectorization as a
-    non-blocking background task so the HTTP response is returned immediately.
-    """
     document, _expired = approve_document(
         session,
         document_id=document_id,
         user_id=current_user.id,
     )
 
-    # Non-blocking: vectorization runs after the response is sent.
-    background_tasks.add_task(_background_vectorize, document_id)
-    logger.info(
-        "vectorization_scheduled",
-        extra={"document_id": str(document_id)},
-    )
+    settings = get_settings()
+    if is_async_mode(settings):
+        try:
+            enqueue_rag_ingestion_task(
+                document_id=str(document_id),
+                force=False,
+                settings=settings,
+            )
+            # Mark as PENDING so the status is visible before the
+            # Cloud Tasks worker picks it up.
+            from app.modules.rag.application.services import (  # noqa: PLC0415
+                mark_ingestion_pending,
+            )
+            mark_ingestion_pending(session, document_id)
+            logger.info(
+                "rag_ingestion_task_enqueued",
+                extra={"document_id": str(document_id)},
+            )
+        except Exception as exc:
+            logger.error(
+                "rag_ingestion_enqueue_failed",
+                extra={"document_id": str(document_id), "error": str(exc)},
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    f"Document approved successfully, but failed to enqueue "
+                    f"RAG ingestion task: {exc}. "
+                    f"You can manually retry ingestion using "
+                    f"POST /api/v1/rag/{document_id}?force=true"
+                ),
+            )
+    else:
+        from app.modules.rag.application.services import (  # noqa: PLC0415
+            ingest_document,
+        )
+
+        try:
+            result = ingest_document(
+                session,
+                document_id=document_id,
+                rag_engine=get_rag_engine(),
+                settings=settings,
+            )
+            logger.info(
+                "rag_ingestion_sync_complete",
+                extra={
+                    "document_id": str(document_id),
+                    "processing_time_ms": result.processing_time_ms,
+                },
+            )
+        except Exception as exc:
+            logger.error(
+                "rag_ingestion_sync_failed",
+                extra={"document_id": str(document_id), "error": str(exc)},
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    f"Document approved successfully, but RAG ingestion failed: {exc}. "
+                    f"You can manually retry ingestion using "
+                    f"POST /api/v1/rag/{document_id}?force=true"
+                ),
+            )
 
     return _build_action_response(document)
 
@@ -483,6 +606,17 @@ def approve_document_route(
     "/{document_id}/reject",
     response_model=DocumentActionResponse,
     status_code=status.HTTP_200_OK,
+    summary="Reject a submitted document",
+    description=(
+        "Rejects a document that is pending review, with a required reason explaining "
+        "what needs to change before the document can be approved."
+    ),
+    response_description="The document's updated workflow status after rejection",
+    responses={
+        404: {"description": RESPONSE_DESCRIPTIONS[404]},
+        409: {"description": "Document is not in 'pending_review' status"},
+        **MUTATE_RESPONSES,
+    },
 )
 def reject_document_route(
     document_id: UUID,
@@ -503,6 +637,17 @@ def reject_document_route(
     "/{document_id}/expire",
     response_model=DocumentActionResponse,
     status_code=status.HTTP_200_OK,
+    summary="Expire an approved document",
+    description=(
+        "Sets an approved document to `expired` status.  "
+        "Expired documents are no longer considered current but remain searchable."
+    ),
+    response_description="The document's updated workflow status after expiry",
+    responses={
+        404: {"description": RESPONSE_DESCRIPTIONS[404]},
+        409: {"description": "Document is not in 'approved' status"},
+        **MUTATE_RESPONSES,
+    },
 )
 def expire_document_route(
     document_id: UUID,
@@ -521,6 +666,16 @@ def expire_document_route(
     "/pending",
     response_model=list[ApprovalQueueItem],
     status_code=status.HTTP_200_OK,
+    summary="List pending approvals",
+    description=(
+        "Returns all documents currently awaiting review (`pending_review` status).  "
+        "Reviewers should use this endpoint to find documents needing their attention."
+    ),
+    response_description="List of documents awaiting approval",
+    responses={
+        403: {"description": RESPONSE_DESCRIPTIONS[403]},
+        500: {"description": RESPONSE_DESCRIPTIONS[500]},
+    },
 )
 def pending_approvals(
     current_user: Annotated[AuthenticatedUser, Depends(require_permission())],

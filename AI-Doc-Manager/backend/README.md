@@ -1,6 +1,6 @@
 # DMS Backend Foundation
 
-Minimal FastAPI backend skeleton for a document management system. This version implements only the platform foundation: app bootstrap, PostgreSQL integration, Alembic, SQLAlchemy 2.0 models, JWT auth, RBAC foundation, MinIO adapter, seed data, Docker support, and basic tests.
+Minimal FastAPI backend skeleton for a document management system. This version implements only the platform foundation: app bootstrap, PostgreSQL integration, Alembic, SQLAlchemy 2.0 models, JWT auth, RBAC foundation, Google Cloud Storage adapter, seed data, Docker support, and basic tests.
 
 ## Directory tree
 
@@ -38,8 +38,7 @@ Minimal FastAPI backend skeleton for a document management system. This version 
 |   |   |   |   |-- __init__.py
 |   |   |   |   `-- models.py
 |   |   |   `-- infrastructure
-|   |   |       |-- __init__.py
-|   |   |       `-- minio_adapter.py
+|   |   |       `-- __init__.py
 |   |   |-- iam
 |   |   |   |-- __init__.py
 |   |   |   |-- api
@@ -73,14 +72,19 @@ Minimal FastAPI backend skeleton for a document management system. This version 
 |   |   |   `-- infrastructure
 |   |   |       |-- __init__.py
 |   |   |       `-- placeholder.py
-|   |   `-- vectorization
+|   |   `-- rag
 |   |       |-- __init__.py
-|   |       |-- domain
-|   |       |   |-- __init__.py
-|   |       |   `-- placeholder.py
-|   |       `-- infrastructure
-|   |           |-- __init__.py
-|   |           `-- placeholder.py
+|   |       |-- api
+|   |       |   |-- router.py
+|   |       |   |-- schemas.py
+|   |       |   |-- worker_auth.py
+|   |       |   `-- worker_router.py
+|   |       |-- application
+|   |       |   |-- retrieval.py
+|   |       |   `-- services.py
+|   |       `-- domain
+|   |           |-- enums.py
+|   |           `-- rag_file_mapping_model.py
 |   |-- shared
 |   |   |-- __init__.py
 |   |   |-- enums.py
@@ -109,9 +113,11 @@ Minimal FastAPI backend skeleton for a document management system. This version 
 - `GET /api/v1/auth/me`
 - PostgreSQL-ready Alembic migration for the required tables and enums
 - RBAC foundation using `roles`, `privileges`, `users`, and `user_roles`
-- MinIO adapter foundation for stable object references such as `minio://documents/path/to/object.pdf`
+- Google Cloud Storage adapter for stable object references such as `gcs://documents/path/to/object.pdf`
+- Vertex AI RAG Engine integration (`app/modules/rag/`) — ingestion, retrieval, worker endpoint
 
-No business APIs for documents, reviews, vectorization, or QA are implemented in this version.
+Local development uses real GCS and RAG Engine via Application Default
+Credentials: run `gcloud auth application-default login` first.
 
 ## Local run with Docker Compose
 
@@ -145,7 +151,7 @@ PowerShell activation:
 .venv\Scripts\Activate.ps1
 ```
 
-2. Update `.env` so `DATABASE_URL` and `MINIO_ENDPOINT` point to your local services.
+2. Update `.env` so `DATABASE_URL`, `GCP_PROJECT_ID`, and `GCS_BUCKET_NAME` point to your local database and GCP project.
 
 3. Run migrations and seed data.
 
@@ -234,8 +240,7 @@ curl http://localhost:8000/api/v1/auth/me \
   -H "Authorization: Bearer <access_token>"
 ```
 
-MinIO:
+Object storage (Google Cloud Storage):
 
-- API endpoint: `http://localhost:9000`
-- Console: `http://localhost:9001`
-- Bucket: `documents`
+- Bucket: value of `GCS_BUCKET_NAME` (default `documents`)
+- Authenticated via Application Default Credentials

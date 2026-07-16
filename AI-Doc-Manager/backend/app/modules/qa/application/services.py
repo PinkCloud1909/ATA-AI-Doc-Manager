@@ -1,18 +1,17 @@
 """Q&A ChatService using Google ADK Runner with DatabaseSessionService.
 
-Session lifecycle (ADK docs):
-  1. Try to get existing session via session_service.get_session()
-  2. If not found, create a new one via session_service.create_session()
-  3. Pass session_id to runner.run_async() — Runner handles history
+Session lifecycle: Runner is configured with ``auto_create_session=True``
+(ADK 2.x).  Sessions are automatically created on first use — no explicit
+session management boilerplate needed.
 """
 
 import logging
 
 from google.adk.runners import Runner
-from google.adk.sessions import DatabaseSessionService
 from google.genai import types
 
 from app.core.config import get_settings
+from app.core.db import create_adk_session_service
 from app.core.exceptions import ExternalServiceError
 from app.modules.qa.domain.agent import root_agent
 
@@ -23,53 +22,22 @@ _APP_NAME = "dms_chat_app"
 
 class ChatService:
     def __init__(self) -> None:
+        # Uses create_adk_session_service which handles Cloud SQL Unix socket /
+        # Cloud SQL Python Connector resolution automatically based on
+        # CLOUD_SQL_CONNECTION_NAME setting.
         settings = get_settings()
-        # DatabaseSessionService requires an async-compatible DB URL.
-        # asyncpg is listed in pyproject.toml and the URL uses postgresql+asyncpg.
-        self.session_service = DatabaseSessionService(
-            db_url=settings.async_database_url
-        )
-        # NOTE: Runner does NOT accept auto_create_session — sessions must be
-        # managed explicitly via session_service before calling run_async().
+        self.session_service = create_adk_session_service(settings)
+        # ADK 2.x auto_create_session=True means sessions are created on first
+        # use — no need for explicit _get_or_create_session boilerplate.
         self.runner = Runner(
             app_name=_APP_NAME,
             agent=root_agent,
             session_service=self.session_service,
+            auto_create_session=True,
         )
-
-    async def _get_or_create_session(self, user_id: str, session_id: str):
-        """Return existing session or create a fresh one."""
-        try:
-            session = await self.session_service.get_session(
-                app_name=_APP_NAME,
-                user_id=user_id,
-                session_id=session_id,
-            )
-            if session is not None:
-                return session
-        except Exception as exc:
-            logger.debug(
-                "session_get_failed",
-                extra={"session_id": session_id, "reason": str(exc)},
-            )
-
-        # Session doesn't exist yet — create it
-        session = await self.session_service.create_session(
-            app_name=_APP_NAME,
-            user_id=user_id,
-            session_id=session_id,
-        )
-        logger.info(
-            "session_created",
-            extra={"session_id": session_id, "user_id": user_id},
-        )
-        return session
 
     async def chat(self, user_id: str, session_id: str, message: str) -> str:
         """Run one conversation turn and return the agent's text response."""
-        # Ensure session exists in the DB before the runner tries to load it
-        await self._get_or_create_session(user_id, session_id)
-
         adk_message = types.Content(
             role="user",
             parts=[types.Part.from_text(text=message)],

@@ -1,10 +1,37 @@
+# Environment files — never ship secrets to the image
 .env
-.git
-.pytest_cache
-.venv
+.env.*
+!.env.example
+
+# Python
 __pycache__/
-*.egg-info/
 *.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Tests — not needed at runtime
+tests/
+app/tests/
 pytest-cache-files-*
 **/pytest-cache-files-*
-app/tests/.pytest_cache/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Development artifacts
+*.patch

@@ -10,7 +10,11 @@ import axios, {
 } from "axios"
 import { clearStoredAccessToken, getStoredAccessToken } from "./authToken"
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api/v1"
+// Use || (not ??) so that an empty string "" also falls back to the relative
+// path.  An empty string happens when the Docker build does not receive the
+// NEXT_PUBLIC_API_URL build-arg (the Dockerfile's `ENV VAR=$VAR` copies the
+// empty arg literally, which ??. treats as "set").
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1"
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,

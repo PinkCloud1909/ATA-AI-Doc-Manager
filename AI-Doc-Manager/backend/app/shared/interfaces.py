@@ -1,10 +1,44 @@
+"""Port interfaces (ABCs) for the hexagonal adapter layer."""
+
+import uuid
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
 
+# ── Retrieval result types ──────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class RetrievedChunk:
+    """One chunk returned by a RAG Engine retrieval."""
+
+    text: str
+    source_uri: str
+    rag_file_id: str | None = None
+    score: float | None = None
+    distance: float | None = None
+    document_id: uuid.UUID | None = None
+    document_title: str | None = None
+
+
+@dataclass(frozen=True)
+class RagIngestResult:
+    """Result of a single RAG Engine file ingestion."""
+
+    rag_file_id: str
+    rag_file_resource: str
+    imported_count: int
+    skipped_count: int
+    failed_count: int
+
+
+# ── Storage port ────────────────────────────────────────────────────────────
+
+
 class IObjectStorage(ABC):
-    """Port for interacting with object storage systems (e.g. MinIO, GCS)."""
+    """Port for interacting with object storage systems (Cloud Storage)."""
 
     @abstractmethod
     def ensure_bucket(self) -> None:
@@ -41,63 +75,56 @@ class IObjectStorage(ABC):
         pass
 
     @abstractmethod
-    def download_object(self, object_reference: str) -> bytes:
-        """Download the entire file content as bytes."""
-        pass
-
-    @abstractmethod
     def build_object_key(self, filename: str, prefix: str = "documents") -> str:
         pass
 
 
-class IVectorStore(ABC):
-    """Port for vector database operations (e.g. ChromaDB, Vertex AI Vector Search)."""
+# ── RAG Engine port ─────────────────────────────────────────────────────────
+
+
+class IRagEngine(ABC):
+    """Port for Vertex AI RAG Engine operations.
+
+    The RAG Engine handles ingestion, chunking, embedding, and retrieval
+    server-side.  This port exposes only the three operations the application
+    needs: ingest a single GCS file, run a text retrieval, and delete a file.
+    """
 
     @abstractmethod
-    def upsert_document(
+    def ingest_file(
         self,
         document_id: str,
-        text_chunks: list[str],
-        embeddings: list[list[float]],
-        metadata: dict | None = None,
-    ) -> None:
-        pass
+        gcs_uri: str,
+        display_name: str | None = None,
+    ) -> RagIngestResult:
+        """Import one file from Cloud Storage into the RAG corpus.
 
-    @abstractmethod
-    def semantic_search(
-        self,
-        query_embedding: list[float],
-        top_k: int = 5,
-        filter_document_ids: list[str] | None = None,
-    ) -> list[dict[str, Any]]:
-        pass
-
-    @abstractmethod
-    def delete_document(self, document_id: str) -> None:
-        pass
-
-
-class ILLMProvider(ABC):
-    """Port for LLM and Embedding models (e.g. Google AI Gemini, Vertex AI)."""
-
-    @abstractmethod
-    def generate_embeddings(
-        self,
-        texts: list[str],
-        task_type: str = "RETRIEVAL_DOCUMENT",
-    ) -> list[list[float]]:
-        """Generate embeddings for a list of texts.
-
-        Args:
-            texts: List of text strings to embed.
-            task_type: Embedding task type for optimization.
-                - ``RETRIEVAL_DOCUMENT`` — indexing corpus/document chunks (default).
-                - ``RETRIEVAL_QUERY``    — general semantic search query.
-                - ``QUESTION_ANSWERING`` — natural-language questions for QA.
-                - ``FACT_VERIFICATION`` — fact-checking statements.
+        The file is chunked and embedded server-side according to the corpus
+        configuration.  Returns the assigned RAG file ID and import counts.
+        Raises :class:`app.core.exceptions.ExternalServiceError` on failure
+        (including partial failures reported by the API).
         """
         pass
 
     @abstractmethod
-    def generate_response(self, prompt: str, context: list[str]) -> str:
+    def retrieve(
+        self,
+        query_text: str,
+        top_k: int = 5,
+        rag_file_ids: list[str] | None = None,
+    ) -> list[RetrievedChunk]:
+        """Semantic search against the RAG corpus.
+
+        If *rag_file_ids* is provided, the search is scoped to those files.
+        Raises :class:`app.core.exceptions.ExternalServiceError` on SDK error.
+        """
+        pass
+
+    @abstractmethod
+    def delete_file(self, rag_file_resource: str) -> None:
+        """Remove a RAG file from the corpus by its full resource name.
+
+        Idempotent — a ``NotFound`` response from the API is treated as
+        success.  Other errors raise :class:`ExternalServiceError`.
+        """
         pass

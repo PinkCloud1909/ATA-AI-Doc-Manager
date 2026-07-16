@@ -1,42 +1,34 @@
-"use client"
+"use client";
 
 /**
  * stores/authStore.ts
  *
- * Với Firebase Auth:
- *  - Không lưu access_token thủ công (Firebase SDK quản lý)
- *  - Chỉ lưu User profile (roles, permissions) từ backend PostgreSQL
- *  - Firebase session tồn tại trong IndexedDB (Firebase persistence)
+ * JWT-based auth via backend. Stores the user profile from GET /api/v1/auth/me.
+ * JWT is managed separately in lib/api/authToken.ts (localStorage + cookie).
  */
 
-import { create } from "zustand"
-import { persist } from "zustand/middleware"
-import { User } from "@/types/user"
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import type { MeResponse } from "@/types/user";
 
 interface AuthState {
-  // Profile từ backend PostgreSQL (roles, permissions)
-  user: User | null
-
-  // Actions
-  setUser:  (user: User | null) => void
-  logout:   () => void
-  isAuthenticated: () => boolean
+  user: MeResponse | null;
+  setUser: (user: MeResponse | null) => void;
+  logout: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       user: null,
 
       setUser: (user) => set({ user }),
 
       logout: () => set({ user: null }),
-
-      isAuthenticated: () => Boolean(get().user),
     }),
     {
-      name:        "auth-user",
-      partialize:  (s) => ({ user: s.user }),
+      name: "auth-user",
+      partialize: (s) => ({ user: s.user }),
     },
   ),
-)
+);

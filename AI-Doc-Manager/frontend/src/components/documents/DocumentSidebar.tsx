@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useTranslation } from "@/i18n/LanguageContext";
 
 interface AIAssessment {
   score: string;
@@ -20,7 +21,7 @@ interface ReviewerInfo {
 export interface DocumentDetailData {
   id: string;
   title: string;
-  status: string; // "Draft" | "Pending" | "Approved" | "Rejected"
+  status: string;
   version: string;
   aiAssessment: AIAssessment;
   reviewer?: ReviewerInfo | null;
@@ -29,91 +30,91 @@ export interface DocumentDetailData {
 interface DocumentSidebarProps {
   data: DocumentDetailData;
   userRole: "viewer" | "editor" | "approver";
+  onApprove?: (grade: number, comment: string) => void;
+  onReject?: (grade: number, comment: string) => void;
+  isApproving?: boolean;
+  isRejecting?: boolean;
 }
 
 export default function DocumentSidebar({
   data,
   userRole,
+  onApprove,
+  onReject,
+  isApproving = false,
+  isRejecting = false,
 }: DocumentSidebarProps) {
+  const { t } = useTranslation();
   const [score, setScore] = useState<string>("");
   const [comment, setComment] = useState<string>("");
 
-  // Chuẩn hóa trạng thái để làm logic (Giả sử BE trả về các keyword này)
   const normalizedStatus = data.status.toLowerCase();
   const isDraft =
-    normalizedStatus.includes("nháp") || normalizedStatus.includes("draft");
+    normalizedStatus.includes("draft") || normalizedStatus.includes("nháp");
   const isPending =
-    normalizedStatus.includes("chờ") || normalizedStatus.includes("pending");
+    normalizedStatus.includes("pending") || normalizedStatus.includes("chờ");
   const isApproved =
-    normalizedStatus.includes("đã duyệt") ||
-    normalizedStatus.includes("approved");
+    normalizedStatus.includes("approved") || normalizedStatus.includes("duyệt");
   const isRejected =
-    normalizedStatus.includes("từ chối") ||
-    normalizedStatus.includes("rejected");
+    normalizedStatus.includes("rejected") || normalizedStatus.includes("từ chối");
 
   const handleApprove = () => {
-    console.log("Approve", { score, comment });
+    const grade = parseFloat(score) || 0;
+    onApprove?.(grade, comment);
   };
 
   const handleReject = () => {
-    console.log("Reject", { score, comment });
+    const grade = parseFloat(score) || 0;
+    onReject?.(grade, comment);
   };
+
+  const statusBadgeClass = isApproved
+    ? "bg-[#e6f4ea] text-[#1e4620]"
+    : isRejected
+      ? "bg-[#fce8e6] text-[#c5221f]"
+      : isPending
+        ? "bg-[#fef7e0] text-[#b06000]"
+        : "bg-tertiary-container text-on-tertiary";
 
   return (
     <aside className="w-96 flex flex-col gap-6 overflow-y-auto pb-4 pr-2 custom-scrollbar shrink-0">
-      {/* 1. THÔNG TIN TÀI LIỆU */}
+      {/* 1. Document Info */}
       <div className="bg-surface-container-lowest rounded-xl p-6 shadow-sm border border-outline-variant/15 shrink-0">
         <div className="flex justify-between items-start mb-4">
           <div>
             <span className="text-[10px] font-label uppercase tracking-widest text-on-surface-variant font-semibold">
-              Tài Liệu
+              {t.documents.title}
             </span>
             <h3 className="font-headline font-bold text-lg text-on-surface mt-1">
               {data.title}
             </h3>
           </div>
-          {/* Đổi màu Badge theo trạng thái */}
-          <span
-            className={`px-3 py-1 rounded-full text-xs font-semibold ${
-              isApproved
-                ? "bg-[#e6f4ea] text-[#1e4620]"
-                : isRejected
-                  ? "bg-[#fce8e6] text-[#c5221f]"
-                  : isPending
-                    ? "bg-[#fef7e0] text-[#b06000]"
-                    : "bg-tertiary-container text-on-tertiary"
-            }`}
-          >
+          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusBadgeClass}`}>
             {data.status}
           </span>
         </div>
         <div className="grid grid-cols-2 gap-4 mt-6">
           <div>
-            <span className="text-xs text-on-surface-variant block mb-1">
-              Mã Số
+            <span className="text-xs text-on-surface-variant block mb-1">ID</span>
+            <span className="font-medium text-sm truncate block" title={data.id}>
+              {data.id.length > 12 ? `${data.id.slice(0, 8)}...` : data.id}
             </span>
-            <span className="font-medium text-sm">{data.id}</span>
           </div>
           <div>
-            <span className="text-xs text-on-surface-variant block mb-1">
-              Phiên Bản
-            </span>
+            <span className="text-xs text-on-surface-variant block mb-1">{t.common.version}</span>
             <span className="font-medium text-sm">{data.version}</span>
           </div>
         </div>
       </div>
 
-      {/* 2. ĐÁNH GIÁ AI */}
+      {/* 2. AI / Vectorization Status */}
       <div className="bg-surface-container-lowest rounded-xl p-6 shadow-sm border border-outline-variant/15 shrink-0">
         <div className="flex items-center gap-2 mb-4">
-          <span
-            className="material-symbols-outlined text-tertiary"
-            style={{ fontSize: "20px" }}
-          >
+          <span className="material-symbols-outlined text-tertiary" style={{ fontSize: "20px" }}>
             auto_awesome
           </span>
           <h4 className="font-headline font-semibold text-md text-on-surface">
-            Đánh Giá AI
+            {t.documents.detail.aiAssessment}
           </h4>
         </div>
         <div className="flex items-center gap-6 mb-6">
@@ -123,68 +124,95 @@ export default function DocumentSidebar({
             </span>
           </div>
           <div className="flex-1">
-            <p className="text-sm font-bold text-on-surface">
-              {data.aiAssessment.label}
-            </p>
+            <p className="text-sm font-bold text-on-surface">{data.aiAssessment.label}</p>
             <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
               {data.aiAssessment.summary}
             </p>
           </div>
         </div>
+        {data.aiAssessment.points.length > 0 && (
+          <div className="space-y-2">
+            {data.aiAssessment.points.map((point, idx) => (
+              <div key={idx} className="flex items-start gap-2 text-xs">
+                <span
+                  className={`material-symbols-outlined text-[16px] mt-0.5 ${
+                    point.isPositive ? "text-green-600" : "text-amber-600"
+                  }`}
+                >
+                  {point.isPositive ? "check_circle" : "info"}
+                </span>
+                <span className="text-on-surface-variant">{point.text}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* 3. LỊCH SỬ NHẬN XÉT (Hiển thị nếu bị từ chối hoặc đã duyệt có comment) */}
+      {/* 3. Reviewer feedback */}
       {data.reviewer && (isRejected || isApproved) && (
         <div
-          className={`rounded-xl p-6 border shrink-0 ${isRejected ? "bg-[#fff7f6] border-[#fe8983]/30" : "bg-surface-container-lowest border-outline-variant/15"}`}
+          className={`rounded-xl p-6 border shrink-0 ${
+            isRejected
+              ? "bg-[#fff7f6] border-[#fe8983]/30"
+              : "bg-surface-container-lowest border-outline-variant/15"
+          }`}
         >
           <h4
-            className={`font-headline font-semibold text-sm mb-3 flex items-center gap-2 ${isRejected ? "text-[#9f403d]" : "text-on-surface"}`}
+            className={`font-headline font-semibold text-sm mb-3 flex items-center gap-2 ${
+              isRejected ? "text-[#9f403d]" : "text-on-surface"
+            }`}
           >
-            <span className="material-symbols-outlined text-[18px]">
-              feedback
-            </span>
-            Phản hồi từ người duyệt
+            <span className="material-symbols-outlined text-[18px]">feedback</span>
+            {t.documents.detail.reviewerFeedback}
           </h4>
           <div className="flex items-center gap-3 mb-3">
-            <img
-              src={data.reviewer.avatar}
-              alt="avatar"
-              className="w-8 h-8 rounded-full object-cover"
-            />
+            {data.reviewer.avatar ? (
+              <img
+                src={data.reviewer.avatar}
+                alt="avatar"
+                className="w-8 h-8 rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-xs font-bold text-on-secondary-container">
+                {data.reviewer.name.charAt(0)}
+              </div>
+            )}
             <div>
-              <p className="text-xs font-bold text-on-surface">
-                {data.reviewer.name}
-              </p>
-              <p className="text-[10px] text-on-surface-variant">
-                {data.reviewer.role}
-              </p>
+              <p className="text-xs font-bold text-on-surface">{data.reviewer.name}</p>
+              <p className="text-[10px] text-on-surface-variant">{data.reviewer.role}</p>
             </div>
             <span
-              className={`ml-auto text-[10px] px-2 py-1 rounded font-bold ${isRejected ? "bg-[#fe8983]/20 text-[#9f403d]" : "bg-[#e6f4ea] text-[#1e4620]"}`}
+              className={`ml-auto text-[10px] px-2 py-1 rounded font-bold ${
+                isRejected
+                  ? "bg-[#fe8983]/20 text-[#9f403d]"
+                  : "bg-[#e6f4ea] text-[#1e4620]"
+              }`}
             >
               {data.reviewer.statusLabel}
             </span>
           </div>
           <p
-            className={`text-sm italic border-l-2 pl-3 ${isRejected ? "text-on-surface border-[#9f403d]/30" : "text-on-surface-variant border-outline-variant/30"}`}
+            className={`text-sm italic border-l-2 pl-3 ${
+              isRejected
+                ? "text-on-surface border-[#9f403d]/30"
+                : "text-on-surface-variant border-outline-variant/30"
+            }`}
           >
             &ldquo;{data.reviewer.comment}&rdquo;
           </p>
         </div>
       )}
 
-      {/* 4. KHU VỰC HÀNH ĐỘNG THEO ROLE & STATUS */}
+      {/* 4. Action Area by Role & Status */}
       <div className="mt-auto pt-4 shrink-0 flex flex-col gap-6">
-        {/* === GIAO DIỆN APPROVER === */}
+        {/* APPROVER UI */}
         {userRole === "approver" && (
           <>
             {isPending ? (
-              // Trạng thái Pending: Hiện Form chấm điểm & Duyệt
               <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/30 overflow-hidden">
                 <div className="bg-surface-container-low px-6 py-3 border-b border-outline-variant/15">
                   <h4 className="font-headline font-semibold text-sm text-on-surface">
-                    Khu Vực Phê Duyệt
+                    {t.approvals.title}
                   </h4>
                 </div>
                 <div className="p-6 space-y-5">
@@ -193,7 +221,7 @@ export default function DocumentSidebar({
                       className="text-xs font-bold text-on-surface-variant block uppercase tracking-wider"
                       htmlFor="reviewer-score"
                     >
-                      Điểm số (0-10)
+                      Score (0-10)
                     </label>
                     <input
                       id="reviewer-score"
@@ -212,120 +240,102 @@ export default function DocumentSidebar({
                       className="text-xs font-bold text-on-surface-variant block uppercase tracking-wider"
                       htmlFor="review-comments"
                     >
-                      Nhận xét / Yêu cầu sửa
+                      {t.documents.detail.rejectReason}
                     </label>
                     <textarea
                       id="review-comments"
                       rows={3}
                       value={comment}
                       onChange={(e) => setComment(e.target.value)}
-                      placeholder="Nhập nhận xét..."
+                      placeholder={t.documents.detail.rejectReasonPlaceholder}
                       className="w-full bg-surface-container-low border-none rounded-lg text-sm text-on-surface focus:ring-1 focus:ring-tertiary/30 resize-none custom-scrollbar"
                     />
                   </div>
                   <div className="flex gap-3 pt-2">
                     <button
                       onClick={handleApprove}
-                      className="flex-1 bg-[#4caf50] text-white py-2.5 rounded-lg font-medium text-sm hover:opacity-90 flex items-center justify-center gap-2 shadow-sm"
+                      disabled={isApproving || isRejecting}
+                      className="flex-1 bg-[#4caf50] text-white py-2.5 rounded-lg font-medium text-sm hover:opacity-90 flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <span className="material-symbols-outlined text-[18px]">
-                        check_circle
-                      </span>{" "}
-                      Duyệt
+                      {isApproving ? (
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                      )}
+                      {t.documents.detail.approve}
                     </button>
                     <button
                       onClick={handleReject}
-                      className="flex-1 bg-[#f44336] text-white py-2.5 rounded-lg font-medium text-sm hover:opacity-90 flex items-center justify-center gap-2 shadow-sm"
+                      disabled={isApproving || isRejecting}
+                      className="flex-1 bg-[#f44336] text-white py-2.5 rounded-lg font-medium text-sm hover:opacity-90 flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <span className="material-symbols-outlined text-[18px]">
-                        cancel
-                      </span>{" "}
-                      Từ chối
+                      {isRejecting ? (
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <span className="material-symbols-outlined text-[18px]">cancel</span>
+                      )}
+                      {t.documents.detail.reject}
                     </button>
                   </div>
                 </div>
               </div>
             ) : (
-              // Trạng thái khác: Không có form duyệt, chỉ báo trạng thái
               <div className="text-center py-4 bg-surface-container-low rounded-xl border border-surface-variant border-dashed">
-                <span
-                  className="material-symbols-outlined text-on-surface-variant mb-1"
-                  style={{ fontSize: "24px" }}
-                >
-                  {isDraft
-                    ? "edit_document"
-                    : isApproved
-                      ? "verified"
-                      : "block"}
+                <span className="material-symbols-outlined text-on-surface-variant mb-1" style={{ fontSize: "24px" }}>
+                  {isDraft ? "edit_document" : isApproved ? "verified" : "block"}
                 </span>
                 <p className="text-xs text-on-surface-variant font-medium px-4">
-                  {isDraft &&
-                    "Tài liệu đang ở dạng nháp. Chưa có yêu cầu phê duyệt."}
-                  {isApproved && "Tài liệu này đã được phê duyệt."}
-                  {isRejected &&
-                    "Tài liệu đã bị từ chối. Đang chờ Editor cập nhật bản mới."}
+                  {isDraft && t.status.draft}
+                  {isApproved && t.status.approved}
+                  {isRejected && t.status.rejected}
                 </p>
               </div>
             )}
           </>
         )}
 
-        {/* === GIAO DIỆN EDITOR === */}
+        {/* EDITOR UI */}
         {userRole === "editor" && (
           <div className="flex flex-col gap-3">
             {(isDraft || isRejected) && (
               <>
                 <button className="w-full bg-tertiary text-on-tertiary py-3 rounded-lg font-semibold text-sm hover:bg-tertiary-dim transition-colors shadow-sm flex items-center justify-center gap-2">
-                  <span className="material-symbols-outlined text-[18px]">
-                    send
-                  </span>
-                  Gửi Yêu Cầu Phê Duyệt
+                  <span className="material-symbols-outlined text-[18px]">send</span>
+                  {t.documents.detail.submitForReview}
                 </button>
                 <button className="w-full bg-surface-container border border-outline-variant/20 text-on-surface py-3 rounded-lg font-semibold text-sm hover:bg-surface-container-high transition-colors flex items-center justify-center gap-2">
-                  <span className="material-symbols-outlined text-[18px]">
-                    upload
-                  </span>
-                  Tải Lên Bản Chỉnh Sửa
+                  <span className="material-symbols-outlined text-[18px]">upload</span>
+                  {t.documents.detail.newVersion}
                 </button>
               </>
             )}
-
             {isApproved && (
               <button className="w-full bg-surface-container border border-outline-variant/20 text-on-surface py-3 rounded-lg font-semibold text-sm hover:bg-surface-container-high transition-colors flex items-center justify-center gap-2 shadow-sm">
-                <span className="material-symbols-outlined text-[18px]">
-                  note_add
-                </span>
-                Tạo Phiên Bản Mới (Draft)
+                <span className="material-symbols-outlined text-[18px]">note_add</span>
+                {t.documents.detail.newVersion}
               </button>
             )}
-
             {isPending && (
               <div className="text-center py-4 bg-surface-container-lowest rounded-xl border border-tertiary/30 bg-tertiary/5">
-                <span
-                  className="material-symbols-outlined text-tertiary mb-1 animate-pulse"
-                  style={{ fontSize: "24px" }}
-                >
+                <span className="material-symbols-outlined text-tertiary mb-1 animate-pulse" style={{ fontSize: "24px" }}>
                   hourglass_empty
                 </span>
                 <p className="text-xs text-tertiary font-bold px-4">
-                  Tài liệu đang chờ phê duyệt. Không thể chỉnh sửa lúc này.
+                  {t.status.pending_review}
                 </p>
               </div>
             )}
           </div>
         )}
 
-        {/* === GIAO DIỆN VIEWER === */}
+        {/* VIEWER UI */}
         {userRole === "viewer" && (
           <div className="text-center py-4 bg-surface-container-low rounded-xl border border-surface-variant border-dashed">
-            <span
-              className="material-symbols-outlined text-on-surface-variant mb-1"
-              style={{ fontSize: "24px" }}
-            >
+            <span className="material-symbols-outlined text-on-surface-variant mb-1" style={{ fontSize: "24px" }}>
               visibility
             </span>
             <p className="text-xs text-on-surface-variant font-medium">
-              Bạn đang xem với quyền Viewer.
+              Viewer
             </p>
           </div>
         )}
