@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.modules.documents.domain.models import Document
-from app.shared.interfaces import IObjectStorage, IVectorStore
+from app.shared.interfaces import IObjectStorage, IRagEngine
 from app.shared.enums import DocumentType, Status
 from app.shared.utils import utcnow
 
@@ -108,10 +108,10 @@ def list_documents(
 def get_document_detail(
     session: Session,
     document_id: UUID,
-    minio_adapter: IObjectStorage,
+    storage: IObjectStorage,
 ) -> tuple[Document, str]:
     document = get_document_by_id(session, document_id)
-    download_url = minio_adapter.generate_presigned_download_url(document.file_link)
+    download_url = storage.generate_presigned_download_url(document.file_link)
     return document, download_url
 
 
@@ -163,29 +163,41 @@ def archive_document(
 def delete_document_permanently(
     session: Session,
     document_id: UUID,
-    minio_adapter: IObjectStorage,
-    vector_store: IVectorStore,
+    storage: IObjectStorage,
+    rag_engine: IRagEngine,
 ) -> None:
     document = get_document_by_id(session, document_id)
     file_link = document.file_link
+
+    # Remove the RAG file from the corpus first (best-effort) — the mapping
+    # row must be read before the document row is deleted (FK CASCADE would
+    # remove it).  A failure here must not block the document deletion.
+    try:
+        from app.modules.rag.domain.rag_file_mapping_model import (  # noqa: PLC0415
+            RagFileMapping,
+        )
+
+        mapping = session.execute(
+            select(RagFileMapping).where(RagFileMapping.document_id == document_id)
+        ).scalar_one_or_none()
+        if mapping is not None:
+            rag_engine.delete_file(mapping.rag_file_resource)
+            session.delete(mapping)
+    except Exception as exc:
+        logger.warning(
+            "rag_delete_failed",
+            extra={"document_id": str(document_id), "error": str(exc)},
+        )
 
     session.delete(document)
     session.commit()
 
     try:
-        minio_adapter.delete_object(file_link)
+        storage.delete_object(file_link)
     except Exception:
         logger.warning(
-            "minio_delete_failed",
+            "storage_delete_failed",
             extra={"document_id": str(document_id), "file_link": file_link},
-        )
-
-    try:
-        vector_store.delete_document(str(document_id))
-    except Exception as exc:
-        logger.warning(
-            "vector_delete_failed",
-            extra={"document_id": str(document_id), "error": str(exc)},
         )
 
     logger.info("document_deleted_permanently", extra={"document_id": str(document_id)})

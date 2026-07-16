@@ -1,8 +1,8 @@
 """RAG-enabled DMS assistant agent.
 
-The agent exposes a single tool – ``search_documents`` – that embeds the
-user's query and retrieves the top-k semantically-similar text chunks from
-the vector store (ChromaDB in dev, Vertex AI Vector Search in prod).
+The agent exposes a single tool – ``search_documents`` – that retrieves the
+top-k semantically-similar text chunks from the RAG Engine and enriches them
+with the originating document's title.
 
 The LLM then grounds its answer **exclusively** on those retrieved chunks,
 preventing hallucination about document contents.
@@ -12,9 +12,10 @@ import logging
 
 from google.adk.agents.llm_agent import Agent
 from google.adk.tools import FunctionTool
+from google.genai import types
 
 from app.core.config import get_settings
-from app.shared.adapters.factory import get_llm_provider, get_vector_store
+from app.modules.rag.application.retrieval import retrieve_chunks
 
 logger = logging.getLogger(__name__)
 
@@ -24,53 +25,40 @@ _settings = get_settings()
 def search_documents(query: str, top_k: int = 5) -> str:
     """Search the document knowledge base for information relevant to *query*.
 
+    Searches all approved, ingested documents in the RAG Engine corpus.
+    When the caller has specific document scope (e.g. runbook generation),
+    it should pass document IDs via context — this base function searches
+    all available documents.
+
     Args:
         query:  The user's natural-language search question.
         top_k:  Number of document chunks to retrieve (default 5).
 
     Returns:
         A formatted string with the retrieved text chunks and their source
-        metadata (document title, chunk index).  Returns a human-readable
+        metadata (document title, similarity score).  Returns a human-readable
         message when no relevant chunks are found.
     """
     try:
-        llm = get_llm_provider()
-        vector_store = get_vector_store()
-
-        # Embed the query using QUESTION_ANSWERING task type.
-        # Documents are indexed with RETRIEVAL_DOCUMENT; queries must use a
-        # compatible asymmetric task type for optimal retrieval quality.
-        # See: https://cloud.google.com/vertex-ai/generative-ai/docs/embeddings/task-types
-        query_embeddings = llm.generate_embeddings(
-            [query],
-            task_type="QUESTION_ANSWERING",
-        )
-        if not query_embeddings:
-            return "Could not generate query embedding."
-
-        query_embedding = query_embeddings[0]
-        results = vector_store.semantic_search(query_embedding, top_k=top_k)
+        results = retrieve_chunks(query=query, top_k=top_k)
 
         if not results:
             return (
                 "No relevant documents found in the knowledge base for that query. "
-                "The document may not have been uploaded and vectorized yet."
+                "The document may not have been uploaded and ingested yet."
             )
 
-        # Format results for the LLM context.
-        # ``score`` = cosine similarity ∈ [−1, 1]; higher = more relevant.
-        # ``distance`` = raw Chroma value; lower = more relevant.
         parts: list[str] = []
-        for i, result in enumerate(results, start=1):
-            meta = result.get("metadata", {})
-            title = meta.get("title", "Unknown document")
-            chunk_idx = meta.get("chunk_index", "?")
-            score = result.get("score")
-            score_str = f"{score:.4f}" if isinstance(score, float) else "n/a"
-            text = result.get("text", "")
+        for i, chunk in enumerate(results, start=1):
+            title = chunk.document_title or chunk.source_uri or "Unknown document"
+            score_str = (
+                f"{chunk.score:.4f}"
+                if isinstance(chunk.score, float)
+                else "n/a"
+            )
             parts.append(
-                f"[Chunk {i}] Source: '{title}' (chunk #{chunk_idx}, similarity: {score_str})\n"
-                f"{text}"
+                f"[Chunk {i}] Source: '{title}' (similarity: {score_str})\n"
+                f"{chunk.text}"
             )
 
         logger.debug(
@@ -85,10 +73,6 @@ def search_documents(query: str, top_k: int = 5) -> str:
 
 
 # The root agent used by ChatService.
-# It has one tool (search_documents) and a grounding instruction that forces
-# it to cite retrieved chunks rather than making up answers.
-# The model name is read from settings so that LLM_MODEL env var controls
-# which Gemini model is used without requiring a code change.
 root_agent = Agent(
     model=_settings.llm_model,
     name="dms_assistant",
@@ -104,4 +88,12 @@ Your job is to answer questions about the documents stored in the system.
 5. If the user asks a general question unrelated to documents (e.g. "hello"), you may answer directly without calling the tool.
 """,
     tools=[FunctionTool(search_documents)],
+    generate_content_config=types.GenerateContentConfig(
+        http_options=types.HttpOptions(
+            retry_options=types.HttpRetryOptions(
+                initial_delay=1.0,
+                attempts=3,
+            ),
+        ),
+    ),
 )
