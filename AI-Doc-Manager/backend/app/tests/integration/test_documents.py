@@ -5,15 +5,15 @@ from unittest.mock import MagicMock
 
 
 from app.main import app
-from app.modules.documents.api.router import _get_storage, _get_vectors
+from app.modules.documents.api.router import _get_storage, _get_rag_engine_dep
 from app.modules.documents.domain.models import Document
 from app.shared.enums import DocumentType, Status
 from app.shared.utils import utcnow
 
 
-MOCK_FILE_LINK = "minio://documents/documents/2026/05/01/abc123-test.pdf"
+MOCK_FILE_LINK = "gcs://test-bucket/documents/2026/05/01/abc123-test.pdf"
 MOCK_DOWNLOAD_URL = (
-    "http://localhost:9000/documents/documents/2026/05/01/abc123-test.pdf?presigned=1"
+    "https://storage.googleapis.com/test-bucket/documents/2026/05/01/abc123-test.pdf?presigned=1"
 )
 
 
@@ -33,13 +33,13 @@ def _override_storage(mock_adapter):
 
 
 @contextmanager
-def _override_vectors(mock_adapter):
-    """Temporarily replace the _get_vectors FastAPI dependency with a mock."""
-    app.dependency_overrides[_get_vectors] = lambda: mock_adapter
+def _override_rag_engine(mock_adapter):
+    """Temporarily replace the _get_rag_engine_dep FastAPI dependency with a mock."""
+    app.dependency_overrides[_get_rag_engine_dep] = lambda: mock_adapter
     try:
         yield mock_adapter
     finally:
-        app.dependency_overrides.pop(_get_vectors, None)
+        app.dependency_overrides.pop(_get_rag_engine_dep, None)
 
 
 def _login_admin(client) -> str:
@@ -281,12 +281,31 @@ class TestSoftDeleteDocument:
 class TestHardDeleteDocument:
     def test_permanent_delete(self, client, db_session):
         mock_storage = MagicMock()
-        mock_vectors = MagicMock()
+        mock_rag = MagicMock()
 
         doc = _create_test_document(db_session)
         doc_id = doc.id
+
+        # Simulate an ingested document with a RAG file mapping so the
+        # delete path exercises the RAG file cleanup.
+        from app.modules.rag.domain.rag_file_mapping_model import RagFileMapping
+        from app.shared.utils import utcnow
+
+        now = utcnow()
+        mapping = RagFileMapping(
+            document_id=doc_id,
+            rag_corpus_resource="projects/p/locations/l/ragCorpora/123",
+            rag_file_id="456",
+            rag_file_resource="projects/p/locations/l/ragCorpora/123/ragFiles/456",
+            imported_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        db_session.add(mapping)
+        db_session.commit()
+
         token = _login_admin(client)
-        with _override_storage(mock_storage), _override_vectors(mock_vectors):
+        with _override_storage(mock_storage), _override_rag_engine(mock_rag):
             response = client.delete(
                 f"/api/v1/documents/{doc_id}/permanent",
                 headers=_auth_header(token),
@@ -295,7 +314,9 @@ class TestHardDeleteDocument:
         assert response.status_code == 200
         assert response.json()["detail"] == "Document permanently deleted"
         mock_storage.delete_object.assert_called_once_with(MOCK_FILE_LINK)
-        mock_vectors.delete_document.assert_called_once_with(str(doc_id))
+        mock_rag.delete_file.assert_called_once_with(
+            "projects/p/locations/l/ragCorpora/123/ragFiles/456"
+        )
 
 
 class TestNewVersion:
@@ -360,10 +381,21 @@ class TestWorkflowEndpoints:
         db_session.commit()
 
         token = _login_admin(client)
-        response = client.post(
-            f"/api/v1/documents/{doc.id}/approve",
-            headers=_auth_header(token),
-        )
+        # RAG ingestion runs synchronously on approve in local mode —
+        # mock it so the test does not call the real RAG Engine.
+        from unittest.mock import patch
+        from app.modules.rag.application.services import IngestionResult
+
+        with patch(
+            "app.modules.rag.application.services.ingest_document",
+            return_value=IngestionResult(
+                document_id=doc.id, status="completed", message="mocked"
+            ),
+        ):
+            response = client.post(
+                f"/api/v1/documents/{doc.id}/approve",
+                headers=_auth_header(token),
+            )
 
         assert response.status_code == 200
         assert response.json()["status"] == "approved"

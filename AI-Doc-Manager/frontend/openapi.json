@@ -1,0 +1,4451 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "dms-backend",
+    "description": "## Document Management System (DMS) Backend\n\nREST API for uploading, versioning, reviewing, and approving documents.  Includes RAG-powered semantic search and Q&A, AI-driven runbook generation, and role-based access control.\n\n### Authentication\n\nMost endpoints require a JWT **Bearer** token obtained from `POST /api/v1/auth/login`.  Include the token in the `Authorization` header:\n\n    Authorization: Bearer <your_token>\n\n### Error Responses\n\nAll error responses follow the same structure:\n\n```json\n{\"detail\": \"Human-readable message\", \"code\": \"machine_readable_code\", \"request_id\": \"uuid\"}\n```\n\n### Pagination\n\nList endpoints return paginated results with `page`, `page_size`, and `total` fields.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/auth/register": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Register a new user account",
+        "description": "Creates a new user with the default 'user' role.  The username must be unique across the system.  Returns the new user's profile, roles, and resolved permissions.",
+        "operationId": "register_api_v1_auth_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The newly created user profile with default roles and permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Username already exists"
+          },
+          "400": {
+            "description": "Bad request — malformed input or missing required fields"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "422": {
+            "description": "Request body or parameters failed validation"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Exchange credentials for a JWT access token",
+        "description": "Authenticates the user with username and password.  Returns a signed JWT that must be included as an `Authorization: Bearer <token>` header on subsequent requests.",
+        "operationId": "login_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "JWT bearer token with expiry details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "400": {
+            "description": "Bad request — malformed input or missing required fields"
+          },
+          "422": {
+            "description": "Request body or parameters failed validation"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Get current user profile and permissions",
+        "description": "Returns the authenticated user's identity, assigned roles, and resolved permission keys.  Use this to introspect the current session and discover what actions are allowed.",
+        "operationId": "me_api_v1_auth_me_get",
+        "responses": {
+          "200": {
+            "description": "Authenticated user's identity, roles, and permission keys",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/users": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Create a new user (admin)",
+        "description": "Creates a new user with the specified roles.  Requires admin-level permissions.  The username must be unique.",
+        "operationId": "create_user_api_v1_admin_users_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Resource conflict (e.g. duplicate username or invalid state transition)"
+          },
+          "400": {
+            "description": "Bad request — malformed input or missing required fields"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "404": {
+            "description": "The requested resource was not found"
+          },
+          "422": {
+            "description": "Request body or parameters failed validation"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List all users (admin)",
+        "description": "Returns a paginated list of all registered users.  Requires admin-level permissions.",
+        "operationId": "list_users_route_api_v1_admin_users_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number (1-based)",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number (1-based)"
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "description": "Items per page (1–200)",
+              "default": 50,
+              "title": "Page Size"
+            },
+            "description": "Items per page (1–200)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of user records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request — malformed input or missing required fields"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "422": {
+            "description": "Request body or parameters failed validation"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users/{user_id}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get a user by ID (admin)",
+        "description": "Returns the details of a specific user including their assigned roles.  Requires admin-level permissions.",
+        "operationId": "get_user_api_v1_admin_users__user_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The requested user's details and roles",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found"
+          },
+          "400": {
+            "description": "Bad request — malformed input or missing required fields"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "422": {
+            "description": "Request body or parameters failed validation"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users/{user_id}/roles": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Assign a role to a user (admin)",
+        "description": "Grants an additional role to a user.  The role must already exist in the system.  Requires admin-level permissions.",
+        "operationId": "assign_role_api_v1_admin_users__user_id__roles_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignRoleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The user's updated profile with all assigned roles",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found"
+          },
+          "409": {
+            "description": "Resource conflict (e.g. duplicate username or invalid state transition)"
+          },
+          "400": {
+            "description": "Bad request — malformed input or missing required fields"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "422": {
+            "description": "Request body or parameters failed validation"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users/{user_id}/roles/{role_name}": {
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Remove a role from a user (admin)",
+        "description": "Revokes a specific role from a user.  Requires admin-level permissions.",
+        "operationId": "remove_role_api_v1_admin_users__user_id__roles__role_name__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "role_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Role Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The user's updated profile after role removal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/roles": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List all roles (admin)",
+        "description": "Returns all defined security roles and their descriptions.  Requires admin-level permissions.",
+        "operationId": "list_roles_route_api_v1_admin_roles_get",
+        "responses": {
+          "200": {
+            "description": "List of all role definitions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RoleResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Roles Route Api V1 Admin Roles Get"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/documents/upload": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Upload a new document",
+        "description": "Upload a document file to the system.  The file is stored in object storage (Google Cloud Storage) and metadata is recorded in the database.\n\n**Supported formats**: PDF, DOCX, TXT, and common image formats.\n\n- `title` and `description` are optional — title defaults to the original filename.\n- `document_type` defaults to `other` if not specified.",
+        "operationId": "upload_document_api_v1_documents_upload_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_document_api_v1_documents_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Metadata for the newly uploaded document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentUploadResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Uploaded file exceeds the maximum allowed size"
+          },
+          "400": {
+            "description": "Bad request — malformed input or missing required fields"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "404": {
+            "description": "The requested resource was not found"
+          },
+          "409": {
+            "description": "Resource conflict (e.g. duplicate username or invalid state transition)"
+          },
+          "422": {
+            "description": "Request body or parameters failed validation"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/documents": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "List documents",
+        "description": "Returns a paginated, filterable list of documents scoped to the authenticated user's role-based visibility.\n\n- **status_filter**: Restrict to documents in a specific lifecycle status.\n- **document_type**: Filter by document category (policy, manual, report, other).\n- **created_by**: Filter by the UUID of the document creator.\n- **page** / **page_size**: Control pagination (max 100 per page).",
+        "operationId": "list_documents_route_api_v1_documents_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "title": "Page Size"
+            }
+          },
+          {
+            "name": "status_filter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Status"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status Filter"
+            }
+          },
+          {
+            "name": "document_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/DocumentType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Document Type"
+            }
+          },
+          {
+            "name": "created_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Created By"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of document summaries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request — malformed input or missing required fields"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "422": {
+            "description": "Request body or parameters failed validation"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Get document details",
+        "description": "Returns full document metadata including its workflow history (who submitted, approved, or rejected it and when) and a time-limited presigned download URL for the file contents.",
+        "operationId": "get_document_api_v1_documents__document_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Full document details with download URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentDetailResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found"
+          },
+          "400": {
+            "description": "Bad request — malformed input or missing required fields"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "409": {
+            "description": "Resource conflict (e.g. duplicate username or invalid state transition)"
+          },
+          "422": {
+            "description": "Request body or parameters failed validation"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Update document metadata",
+        "description": "Update the title, description, or document type of an existing document.  Only the fields provided are changed — omitted fields keep their current values.",
+        "operationId": "update_document_api_v1_documents__document_id__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated document metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentUploadResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found"
+          },
+          "400": {
+            "description": "Bad request — malformed input or missing required fields"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "409": {
+            "description": "Resource conflict (e.g. duplicate username or invalid state transition)"
+          },
+          "422": {
+            "description": "Request body or parameters failed validation"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Archive a document (soft delete)",
+        "description": "Archives a document by setting its status to `archived`.  The document and its file are retained but hidden from normal listings.  Use `/permanent` to fully delete.",
+        "operationId": "soft_delete_document_api_v1_documents__document_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Confirmation that the document was archived",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentDeleteResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/permanent": {
+      "delete": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Permanently delete a document",
+        "description": "Irreversibly deletes a document, its stored file, and all associated vector embeddings.  This action cannot be undone.",
+        "operationId": "hard_delete_document_api_v1_documents__document_id__permanent_delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Confirmation that the document was permanently deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentDeleteResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/new-version": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Create a new version of a document",
+        "description": "Uploads a new file as the next version of an existing document.  The version number is automatically incremented.  The new version starts in `draft` status.",
+        "operationId": "new_version_document_api_v1_documents__document_id__new_version_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_new_version_document_api_v1_documents__document_id__new_version_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Metadata for the newly created version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentUploadResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found"
+          },
+          "413": {
+            "description": "Uploaded file exceeds the maximum allowed size"
+          },
+          "400": {
+            "description": "Bad request — malformed input or missing required fields"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "409": {
+            "description": "Resource conflict (e.g. duplicate username or invalid state transition)"
+          },
+          "422": {
+            "description": "Request body or parameters failed validation"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/submit": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Submit a document for review",
+        "description": "Transitions a document from `draft` to `pending_review` status.  The document then appears in the approvals queue for reviewers to act on.",
+        "operationId": "submit_document_api_v1_documents__document_id__submit_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The document's updated workflow status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentActionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found"
+          },
+          "409": {
+            "description": "Resource conflict (e.g. duplicate username or invalid state transition)"
+          },
+          "400": {
+            "description": "Bad request — malformed input or missing required fields"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "422": {
+            "description": "Request body or parameters failed validation"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/approve": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Approve a document and trigger RAG ingestion",
+        "description": "Approves a submitted document and triggers RAG Engine ingestion for semantic search.\n\n- **Production** (ENVIRONMENT=production + CLOUD_TASKS_QUEUE_NAME set): Enqueues a Cloud Tasks task to ingest asynchronously and returns 200 immediately.\n- **Local / dev**: Runs ingestion synchronously — RAG Engine handles parsing/chunking/embedding server-side, so the request completes in seconds.\n\nIf ingestion fails, the document remains approved and a 500 is returned.  The client can manually retry via `POST /api/v1/rag/{document_id}`.",
+        "operationId": "approve_document_route_api_v1_documents__document_id__approve_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The document's updated workflow status after approval",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentActionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found"
+          },
+          "409": {
+            "description": "Resource conflict (e.g. duplicate username or invalid state transition)"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "400": {
+            "description": "Bad request — malformed input or missing required fields"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "422": {
+            "description": "Request body or parameters failed validation"
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/reject": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Reject a submitted document",
+        "description": "Rejects a document that is pending review, with a required reason explaining what needs to change before the document can be approved.",
+        "operationId": "reject_document_route_api_v1_documents__document_id__reject_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The document's updated workflow status after rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentActionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found"
+          },
+          "409": {
+            "description": "Resource conflict (e.g. duplicate username or invalid state transition)"
+          },
+          "400": {
+            "description": "Bad request — malformed input or missing required fields"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "422": {
+            "description": "Request body or parameters failed validation"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/expire": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Expire an approved document",
+        "description": "Sets an approved document to `expired` status.  Expired documents are no longer considered current but remain searchable.",
+        "operationId": "expire_document_route_api_v1_documents__document_id__expire_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The document's updated workflow status after expiry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentActionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found"
+          },
+          "409": {
+            "description": "Resource conflict (e.g. duplicate username or invalid state transition)"
+          },
+          "400": {
+            "description": "Bad request — malformed input or missing required fields"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "422": {
+            "description": "Request body or parameters failed validation"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/v1/approvals/pending": {
+      "get": {
+        "tags": [
+          "approvals"
+        ],
+        "summary": "List pending approvals",
+        "description": "Returns all documents currently awaiting review (`pending_review` status).  Reviewers should use this endpoint to find documents needing their attention.",
+        "operationId": "pending_approvals_api_v1_approvals_pending_get",
+        "responses": {
+          "200": {
+            "description": "List of documents awaiting approval",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ApprovalQueueItem"
+                  },
+                  "type": "array",
+                  "title": "Response Pending Approvals Api V1 Approvals Pending Get"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/documents/{document_id}/reviews": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "summary": "Submit a document review",
+        "description": "Creates a new review for a document with a numeric grade (1–10) and written feedback.  The reviewing user is recorded automatically.",
+        "operationId": "add_review_api_v1_documents__document_id__reviews_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The newly created review record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found"
+          },
+          "400": {
+            "description": "Bad request — malformed input or missing required fields"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "409": {
+            "description": "Resource conflict (e.g. duplicate username or invalid state transition)"
+          },
+          "422": {
+            "description": "Request body or parameters failed validation"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "reviews"
+        ],
+        "summary": "List reviews for a document",
+        "description": "Returns a paginated list of all reviews submitted for the specified document, ordered by creation date (most recent first).",
+        "operationId": "get_reviews_api_v1_documents__document_id__reviews_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number (1-based)",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number (1-based)"
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Items per page (1–100)",
+              "default": 20,
+              "title": "Page Size"
+            },
+            "description": "Items per page (1–100)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of reviews",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewListResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Document not found"
+          },
+          "400": {
+            "description": "Bad request — malformed input or missing required fields"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "422": {
+            "description": "Request body or parameters failed validation"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/v1/qa/chat": {
+      "post": {
+        "tags": [
+          "qa"
+        ],
+        "summary": "Send a message to the RAG-powered DMS assistant",
+        "description": "Run one conversation turn with the RAG-powered assistant.  The agent automatically searches the vector store for relevant document chunks before composing an answer.\n\n- If `session_id` is omitted a new session UUID is generated.\n- Reuse the returned `session_id` in follow-up messages to maintain context.",
+        "operationId": "chat_api_v1_qa_chat_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The assistant's reply with the session identifier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "400": {
+            "description": "Bad request — malformed input or missing required fields"
+          },
+          "422": {
+            "description": "Request body or parameters failed validation"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/rag/bulk": {
+      "post": {
+        "tags": [
+          "rag"
+        ],
+        "summary": "Bulk ingest multiple documents into RAG Engine",
+        "description": "Ingest multiple documents in a single request.\n\n- **Production** (async Cloud Tasks): Each document is enqueued as an independent Cloud Tasks task.  Returns 202 Accepted immediately.\n- **Local / dev**: Runs synchronously in-request.  Each document is processed in an isolated database transaction so a failure in one does not roll back prior successes.",
+        "operationId": "bulk_ingest_route_api_v1_rag_bulk_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Re-ingest even if already completed",
+              "default": false,
+              "title": "Force"
+            },
+            "description": "Re-ingest even if already completed"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkIngestionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Tasks enqueued for asynchronous processing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/BulkIngestionResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BulkTaskAcceptedResponse"
+                    }
+                  ],
+                  "title": "Response Bulk Ingest Route Api V1 Rag Bulk Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request — malformed input or missing required fields"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "404": {
+            "description": "The requested resource was not found"
+          },
+          "409": {
+            "description": "Resource conflict (e.g. duplicate username or invalid state transition)"
+          },
+          "422": {
+            "description": "Request body or parameters failed validation"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/v1/rag/{document_id}": {
+      "post": {
+        "tags": [
+          "rag"
+        ],
+        "summary": "Ingest a single document into RAG Engine",
+        "description": "Ingest a single approved document for semantic search and RAG.\n\n- **Production** (async Cloud Tasks): Enqueues a Cloud Tasks task and returns 202 Accepted immediately.  The actual ingestion runs asynchronously via the worker endpoint.\n- **Local / dev**: Runs synchronously and returns the full result.\n\nSet ``force=true`` to re-ingest a document that has already been processed (required after changing the layout parser config).",
+        "operationId": "ingest_document_route_api_v1_rag__document_id__post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Re-ingest even if already completed",
+              "default": false,
+              "title": "Force"
+            },
+            "description": "Re-ingest even if already completed"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Task enqueued for asynchronous processing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/TaskAcceptedResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IngestionResponse"
+                    }
+                  ],
+                  "title": "Response Ingest Document Route Api V1 Rag  Document Id  Post"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found"
+          },
+          "400": {
+            "description": "Bad request — malformed input or missing required fields"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "409": {
+            "description": "Resource conflict (e.g. duplicate username or invalid state transition)"
+          },
+          "422": {
+            "description": "Request body or parameters failed validation"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "rag"
+        ],
+        "summary": "Delete RAG ingestion data for a document",
+        "description": "Removes the document's RAG file from the corpus and resets its ingestion status.  The document file in Cloud Storage is not affected.",
+        "operationId": "delete_ingestion_route_api_v1_rag__document_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Confirmation that ingestion data was deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rag/{document_id}/status": {
+      "get": {
+        "tags": [
+          "rag"
+        ],
+        "summary": "Get RAG ingestion status of a document",
+        "description": "Lightweight check returning the document's current RAG ingestion status, error message (if failed), and timestamps.",
+        "operationId": "ingestion_status_route_api_v1_rag__document_id__status_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current ingestion status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestionStatusResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found"
+          },
+          "400": {
+            "description": "Bad request — malformed input or missing required fields"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "409": {
+            "description": "Resource conflict (e.g. duplicate username or invalid state transition)"
+          },
+          "422": {
+            "description": "Request body or parameters failed validation"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/v1/runbooks/generate": {
+      "post": {
+        "tags": [
+          "runbooks"
+        ],
+        "summary": "Generate a structured markdown runbook from vectorized documents",
+        "description": "Synthesises a markdown runbook from the specified set of documents using a specific purpose template.  The purpose drives the structure and tone of the generated output.\n\nSupported purposes: onboarding, incident_response, deployment, troubleshooting, training, and other.\n\n**Requires authentication** (any authenticated user can use this endpoint).",
+        "operationId": "generate_runbook_api_v1_runbooks_generate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunbookGenerateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The generated runbook with full content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunbookResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "400": {
+            "description": "Bad request — malformed input or missing required fields"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "404": {
+            "description": "The requested resource was not found"
+          },
+          "409": {
+            "description": "Resource conflict (e.g. duplicate username or invalid state transition)"
+          },
+          "422": {
+            "description": "Request body or parameters failed validation"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/runbooks": {
+      "get": {
+        "tags": [
+          "runbooks"
+        ],
+        "summary": "List generated runbooks",
+        "description": "Returns a paginated list of runbooks generated by the authenticated user.  Results are scoped to the requesting user for privacy.",
+        "operationId": "list_generated_runbooks_api_v1_runbooks_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of runbook summaries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunbookListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request — malformed input or missing required fields"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "422": {
+            "description": "Request body or parameters failed validation"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/v1/runbooks/{runbook_id}": {
+      "get": {
+        "tags": [
+          "runbooks"
+        ],
+        "summary": "Get details of a runbook",
+        "description": "Returns the full content and metadata of a specific runbook by its UUID.  Includes the generated markdown content and the list of source documents.",
+        "operationId": "get_runbook_api_v1_runbooks__runbook_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "runbook_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Runbook Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Full runbook with generated content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunbookResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Runbook not found"
+          },
+          "400": {
+            "description": "Bad request — malformed input or missing required fields"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "422": {
+            "description": "Request body or parameters failed validation"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "runbooks"
+        ],
+        "summary": "Delete a runbook",
+        "description": "Permanently deletes a runbook from the database.  The generated content is removed and cannot be recovered.",
+        "operationId": "remove_runbook_api_v1_runbooks__runbook_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "runbook_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Runbook Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Confirmation that the runbook was deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunbookDeleteResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource was not found"
+          },
+          "401": {
+            "description": "Missing or invalid authentication credentials"
+          },
+          "403": {
+            "description": "Authenticated user lacks the required permission"
+          },
+          "500": {
+            "description": "Internal server error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Liveness probe",
+        "description": "Returns 200 OK to indicate the service process is running.  Does **not** verify database connectivity — use `/ready` for that purpose.  Intended for container orchestrators and load balancer health checks.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Service is alive",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ready": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Readiness probe",
+        "description": "Verifies that both the synchronous (write-path) and asynchronous (chat-path) database connections are reachable.  Returns 503 if either is down.  Intended for load balancer readiness checks and container orchestration startup probes.",
+        "operationId": "ready_ready_get",
+        "responses": {
+          "200": {
+            "description": "All dependencies are reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A dependent service (database, vector store) is temporarily unavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApprovalQueueItem": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id",
+            "description": "Unique document identifier",
+            "examples": [
+              "550e8400-e29b-41d4-a716-446655440000"
+            ]
+          },
+          "document_group_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Group Id",
+            "description": "Group identifier linking all versions of the same logical document"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "description": "Document version number",
+            "examples": [
+              2
+            ]
+          },
+          "document_type": {
+            "$ref": "#/components/schemas/DocumentType",
+            "description": "Document category"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status",
+            "description": "Current lifecycle status (typically 'pending_review')"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By",
+            "description": "UUID of the document creator"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At",
+            "description": "Timestamp when the document was created (UTC)"
+          },
+          "submitted_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted By",
+            "description": "UUID of the user who submitted the document for review"
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At",
+            "description": "Timestamp when the document was submitted (UTC)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "document_group_id",
+          "version",
+          "document_type",
+          "status"
+        ],
+        "title": "ApprovalQueueItem",
+        "description": "Lightweight item in the pending-approval queue.",
+        "example": {
+          "created_at": "2026-07-01T10:00:00Z",
+          "created_by": "660e8400-e29b-41d4-a716-446655440001",
+          "document_group_id": "550e8400-e29b-41d4-a716-446655440000",
+          "document_id": "550e8400-e29b-41d4-a716-446655440000",
+          "document_type": "policy",
+          "status": "pending_review",
+          "submitted_at": "2026-07-02T09:00:00Z",
+          "submitted_by": "660e8400-e29b-41d4-a716-446655440001",
+          "version": 1
+        }
+      },
+      "AssignRoleRequest": {
+        "properties": {
+          "role_name": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Role Name",
+            "description": "Name of the role to assign (e.g. 'editor', 'admin')",
+            "examples": [
+              "editor"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "role_name"
+        ],
+        "title": "AssignRoleRequest",
+        "description": "Payload to assign an additional role to a user.",
+        "example": {
+          "role_name": "editor"
+        }
+      },
+      "Body_new_version_document_api_v1_documents__document_id__new_version_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_new_version_document_api_v1_documents__document_id__new_version_post"
+      },
+      "Body_upload_document_api_v1_documents_upload_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "document_type": {
+            "$ref": "#/components/schemas/DocumentType",
+            "default": "other"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_document_api_v1_documents_upload_post"
+      },
+      "BulkIngestionRequest": {
+        "properties": {
+          "document_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Document Ids",
+            "description": "Document UUIDs to ingest (1–50)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_ids"
+        ],
+        "title": "BulkIngestionRequest",
+        "description": "Request to ingest multiple documents at once."
+      },
+      "BulkIngestionResponse": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/IngestionResponse"
+            },
+            "type": "array",
+            "title": "Results"
+          },
+          "total_processed": {
+            "type": "integer",
+            "title": "Total Processed",
+            "default": 0
+          },
+          "total_failed": {
+            "type": "integer",
+            "title": "Total Failed",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "BulkIngestionResponse",
+        "description": "Aggregated result for a bulk ingestion request."
+      },
+      "BulkTaskAcceptedResponse": {
+        "properties": {
+          "accepted": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Accepted"
+          },
+          "failed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "BulkTaskAcceptedResponse",
+        "description": "Returned for bulk enqueue requests."
+      },
+      "ChatRequest": {
+        "properties": {
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id",
+            "description": "A unique identifier for the chat session. If not provided, a new session will be created.",
+            "examples": [
+              "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "The user's message or question to the RAG assistant",
+            "examples": [
+              "What security policies cover document access?"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "ChatRequest",
+        "description": "Payload for a single turn of the RAG-powered Q&A chat.",
+        "example": {
+          "message": "What security policies cover document access?",
+          "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        }
+      },
+      "ChatResponse": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id",
+            "description": "The unique identifier for the chat session (reuse in follow-up messages)",
+            "examples": [
+              "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+            ]
+          },
+          "response": {
+            "type": "string",
+            "title": "Response",
+            "description": "The assistant's generated answer based on retrieved document chunks",
+            "examples": [
+              "Based on the Q4 Security Policy, document access is governed by..."
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "response"
+        ],
+        "title": "ChatResponse",
+        "description": "The assistant's reply for a single chat turn.",
+        "example": {
+          "response": "Based on the Q4 Security Policy, document access is governed by role-based permissions. Only users with the 'editor' or 'admin' role can modify documents.",
+          "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        }
+      },
+      "CreateUserRequest": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 3,
+            "title": "Username",
+            "description": "Desired username (3–100 characters, unique across the system)",
+            "examples": [
+              "jdoe"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 8,
+            "title": "Password",
+            "description": "Account password (minimum 8 characters)",
+            "examples": [
+              "secure-initial-password"
+            ]
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Roles",
+            "description": "Role names to assign at creation time (e.g. ['editor', 'viewer'])",
+            "examples": [
+              [
+                "editor",
+                "viewer"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "CreateUserRequest",
+        "description": "Payload for an admin to create a new user with initial roles.",
+        "example": {
+          "password": "secure-initial-password",
+          "roles": [
+            "editor",
+            "viewer"
+          ],
+          "username": "jdoe"
+        }
+      },
+      "DocumentActionResponse": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id",
+            "description": "Unique document identifier",
+            "examples": [
+              "550e8400-e29b-41d4-a716-446655440000"
+            ]
+          },
+          "document_group_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Group Id",
+            "description": "Group identifier linking all versions of the same logical document",
+            "examples": [
+              "550e8400-e29b-41d4-a716-446655440000"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "description": "Monotonically increasing version number (1-based)",
+            "examples": [
+              3
+            ]
+          },
+          "document_type": {
+            "$ref": "#/components/schemas/DocumentType",
+            "description": "Document category: policy, manual, report, or other"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status",
+            "description": "Current lifecycle status after the action"
+          },
+          "submitted_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted By",
+            "description": "UUID of the user who submitted the document for review"
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At",
+            "description": "Timestamp when the document was submitted (UTC)"
+          },
+          "approved_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved By",
+            "description": "UUID of the user who approved the document"
+          },
+          "approved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At",
+            "description": "Timestamp when the document was approved (UTC)"
+          },
+          "rejected_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejected By",
+            "description": "UUID of the user who rejected the document"
+          },
+          "rejected_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejected Reason",
+            "description": "Reason the document was rejected (1–2000 characters)"
+          },
+          "rejected_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejected At",
+            "description": "Timestamp when the document was rejected (UTC)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "document_group_id",
+          "version",
+          "document_type",
+          "status"
+        ],
+        "title": "DocumentActionResponse",
+        "description": "Result of a workflow action (submit, approve, reject, expire).",
+        "example": {
+          "approved_at": "2026-07-02T14:30:00Z",
+          "approved_by": "770e8400-e29b-41d4-a716-446655440002",
+          "document_group_id": "550e8400-e29b-41d4-a716-446655440000",
+          "document_id": "550e8400-e29b-41d4-a716-446655440000",
+          "document_type": "policy",
+          "status": "approved",
+          "submitted_at": "2026-07-01T10:00:00Z",
+          "submitted_by": "660e8400-e29b-41d4-a716-446655440001",
+          "version": 1
+        }
+      },
+      "DocumentDeleteResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "description": "Human-readable confirmation message",
+            "examples": [
+              "Document archived successfully"
+            ]
+          },
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id",
+            "description": "UUID of the affected document",
+            "examples": [
+              "550e8400-e29b-41d4-a716-446655440000"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "document_id"
+        ],
+        "title": "DocumentDeleteResponse",
+        "description": "Confirmation of a document deletion.",
+        "example": {
+          "detail": "Document archived successfully",
+          "document_id": "550e8400-e29b-41d4-a716-446655440000"
+        }
+      },
+      "DocumentDetailResponse": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id",
+            "description": "Unique document identifier",
+            "examples": [
+              "550e8400-e29b-41d4-a716-446655440000"
+            ]
+          },
+          "document_group_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Group Id",
+            "description": "Group identifier linking all versions of the same logical document"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "description": "Monotonically increasing version number (1-based)",
+            "examples": [
+              3
+            ]
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "Human-readable document title",
+            "examples": [
+              "Q4 Security Policy v3"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Optional description or summary of the document",
+            "examples": [
+              "Updated SOC 2 compliance sections for 2026."
+            ]
+          },
+          "original_filename": {
+            "type": "string",
+            "title": "Original Filename",
+            "description": "Original filename as uploaded",
+            "examples": [
+              "q4-security-policy.pdf"
+            ]
+          },
+          "document_type": {
+            "$ref": "#/components/schemas/DocumentType",
+            "description": "Document category"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status",
+            "description": "Current lifecycle status"
+          },
+          "file_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Size",
+            "description": "File size in bytes",
+            "examples": [
+              245760
+            ]
+          },
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Type",
+            "description": "MIME type of the stored file",
+            "examples": [
+              "application/pdf"
+            ]
+          },
+          "download_url": {
+            "type": "string",
+            "title": "Download Url",
+            "description": "Presigned URL for downloading the document file (time-limited)",
+            "examples": [
+              "https://storage.example.com/documents/abc123.pdf?signature=..."
+            ]
+          },
+          "rag_ingestion_status": {
+            "type": "string",
+            "title": "Rag Ingestion Status",
+            "description": "RAG Engine ingestion status (not_ingested, pending, ingesting, completed, failed)"
+          },
+          "rag_ingestion_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rag Ingestion Error",
+            "description": "Error message if RAG ingestion failed"
+          },
+          "rag_ingested_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rag Ingested At",
+            "description": "Timestamp when the document was last ingested into RAG (UTC)"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By",
+            "description": "UUID of the user who created the document"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At",
+            "description": "Timestamp when the document was created (UTC)"
+          },
+          "modified_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modified By",
+            "description": "UUID of the user who last modified the metadata"
+          },
+          "modified_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modified Date",
+            "description": "Timestamp of the last metadata modification (UTC)"
+          },
+          "submitted_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted By",
+            "description": "UUID of the user who submitted the document for review"
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At",
+            "description": "Timestamp when the document was submitted (UTC)"
+          },
+          "approved_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved By",
+            "description": "UUID of the user who approved the document"
+          },
+          "approved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At",
+            "description": "Timestamp when the document was approved (UTC)"
+          },
+          "rejected_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejected By",
+            "description": "UUID of the user who rejected the document"
+          },
+          "rejected_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejected Reason",
+            "description": "Reason the document was rejected"
+          },
+          "rejected_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejected At",
+            "description": "Timestamp when the document was rejected (UTC)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "document_group_id",
+          "version",
+          "title",
+          "original_filename",
+          "document_type",
+          "status",
+          "download_url",
+          "rag_ingestion_status"
+        ],
+        "title": "DocumentDetailResponse",
+        "description": "Full document details including workflow history and download URL.",
+        "example": {
+          "approved_at": "2026-07-02T14:30:00Z",
+          "approved_by": "770e8400-e29b-41d4-a716-446655440002",
+          "content_type": "application/pdf",
+          "created_at": "2026-07-01T10:00:00Z",
+          "created_by": "660e8400-e29b-41d4-a716-446655440001",
+          "description": "Updated SOC 2 compliance sections for 2026.",
+          "document_group_id": "550e8400-e29b-41d4-a716-446655440000",
+          "document_id": "550e8400-e29b-41d4-a716-446655440000",
+          "document_type": "policy",
+          "download_url": "https://storage.example.com/documents/abc123.pdf",
+          "file_size": 245760,
+          "modified_by": "660e8400-e29b-41d4-a716-446655440001",
+          "modified_date": "2026-07-02T08:30:00Z",
+          "original_filename": "q4-security-policy.pdf",
+          "rag_ingested_at": "2026-07-02T14:30:00Z",
+          "rag_ingestion_status": "completed",
+          "status": "approved",
+          "submitted_at": "2026-07-02T09:00:00Z",
+          "submitted_by": "660e8400-e29b-41d4-a716-446655440001",
+          "title": "Q4 Security Policy v3",
+          "version": 3
+        }
+      },
+      "DocumentListItem": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id",
+            "description": "Unique document identifier"
+          },
+          "document_group_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Group Id",
+            "description": "Group identifier linking all versions of the same logical document"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "description": "Document version number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "Human-readable document title"
+          },
+          "original_filename": {
+            "type": "string",
+            "title": "Original Filename",
+            "description": "Original filename as uploaded"
+          },
+          "document_type": {
+            "$ref": "#/components/schemas/DocumentType",
+            "description": "Document category"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status",
+            "description": "Current lifecycle status"
+          },
+          "file_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Size",
+            "description": "File size in bytes"
+          },
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Type",
+            "description": "MIME type of the stored file"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By",
+            "description": "UUID of the document creator"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At",
+            "description": "Timestamp when the document was created (UTC)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "document_group_id",
+          "version",
+          "title",
+          "original_filename",
+          "document_type",
+          "status"
+        ],
+        "title": "DocumentListItem",
+        "description": "Lightweight document summary for list views."
+      },
+      "DocumentListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentListItem"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Document summaries for the current page"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total number of documents matching the query (across all pages)",
+            "examples": [
+              150
+            ]
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page",
+            "description": "Current page number (1-based)",
+            "examples": [
+              1
+            ]
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size",
+            "description": "Number of items per page (max 100)",
+            "examples": [
+              20
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "DocumentListResponse",
+        "description": "Paginated list of documents."
+      },
+      "DocumentType": {
+        "type": "string",
+        "enum": [
+          "policy",
+          "manual",
+          "report",
+          "other"
+        ],
+        "title": "DocumentType",
+        "description": "Document category — used for filtering and classification."
+      },
+      "DocumentUpdateRequest": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "New title for the document (1–500 characters, optional)",
+            "examples": [
+              "Q4 Security Policy — Final Approved"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Updated description or summary (optional)",
+            "examples": [
+              "Final approved version with all committee feedback incorporated."
+            ]
+          },
+          "document_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated document category (optional)"
+          }
+        },
+        "type": "object",
+        "title": "DocumentUpdateRequest",
+        "description": "Fields that can be updated on an existing document.",
+        "example": {
+          "description": "Final approved version with all committee feedback incorporated.",
+          "document_type": "policy",
+          "title": "Q4 Security Policy — Final Approved"
+        }
+      },
+      "DocumentUploadResponse": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id",
+            "description": "Unique document identifier",
+            "examples": [
+              "550e8400-e29b-41d4-a716-446655440000"
+            ]
+          },
+          "document_group_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Group Id",
+            "description": "Group identifier linking all versions of the same logical document"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "description": "Monotonically increasing version number (1-based)",
+            "examples": [
+              1
+            ]
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "Document title (derived from filename if not explicitly provided)",
+            "examples": [
+              "Q4 Security Policy v2"
+            ]
+          },
+          "original_filename": {
+            "type": "string",
+            "title": "Original Filename",
+            "description": "Original filename as uploaded by the user",
+            "examples": [
+              "q4-security-policy-v2.pdf"
+            ]
+          },
+          "document_type": {
+            "$ref": "#/components/schemas/DocumentType",
+            "description": "Document category"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status",
+            "description": "Current lifecycle status (typically 'draft' for new uploads)"
+          },
+          "file_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Size",
+            "description": "File size in bytes",
+            "examples": [
+              245760
+            ]
+          },
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Type",
+            "description": "MIME type of the uploaded file (e.g. 'application/pdf')",
+            "examples": [
+              "application/pdf"
+            ]
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By",
+            "description": "UUID of the user who uploaded the document"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At",
+            "description": "Timestamp when the document was created (UTC)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "document_group_id",
+          "version",
+          "title",
+          "original_filename",
+          "document_type",
+          "status"
+        ],
+        "title": "DocumentUploadResponse",
+        "description": "Result of a document upload or new-version creation.",
+        "example": {
+          "content_type": "application/pdf",
+          "created_at": "2026-07-01T10:00:00Z",
+          "created_by": "660e8400-e29b-41d4-a716-446655440001",
+          "document_group_id": "550e8400-e29b-41d4-a716-446655440000",
+          "document_id": "550e8400-e29b-41d4-a716-446655440000",
+          "document_type": "policy",
+          "file_size": 245760,
+          "original_filename": "q4-security-policy.pdf",
+          "status": "draft",
+          "title": "Q4 Security Policy",
+          "version": 1
+        }
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Always 'ok' when the service process is running",
+            "default": "ok",
+            "examples": [
+              "ok"
+            ]
+          }
+        },
+        "type": "object",
+        "title": "HealthResponse",
+        "description": "Response for the liveness probe (GET /health).",
+        "example": {
+          "status": "ok"
+        }
+      },
+      "IngestionResponse": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id",
+            "description": "Document UUID"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "RAG ingestion status (completed, failed, etc.)"
+          },
+          "rag_file_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rag File Id",
+            "description": "Server-assigned RAG file ID"
+          },
+          "processing_time_ms": {
+            "type": "number",
+            "title": "Processing Time Ms",
+            "description": "Wall-clock duration of the ingestion in milliseconds",
+            "default": 0.0
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable result summary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "status",
+          "message"
+        ],
+        "title": "IngestionResponse",
+        "description": "Response returned after a synchronous RAG ingestion operation."
+      },
+      "IngestionStatusResponse": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "rag_ingested_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rag Ingested At"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "status"
+        ],
+        "title": "IngestionStatusResponse",
+        "description": "Current ingestion status of a document."
+      },
+      "LoginRequest": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Username",
+            "description": "Registered username (1–100 characters)",
+            "examples": [
+              "jdoe"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Password",
+            "description": "Account password (1–255 characters)",
+            "examples": [
+              "my-secure-password"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "LoginRequest",
+        "description": "Credentials for obtaining a JWT access token.",
+        "example": {
+          "password": "my-secure-password",
+          "username": "jdoe"
+        }
+      },
+      "MeResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "Unique user identifier (UUID v4)",
+            "examples": [
+              "550e8400-e29b-41d4-a716-446655440000"
+            ]
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "description": "Registered username",
+            "examples": [
+              "jdoe"
+            ]
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Roles",
+            "description": "Role names assigned to this user (e.g. 'admin', 'editor', 'viewer')",
+            "examples": [
+              [
+                "editor",
+                "viewer"
+              ]
+            ]
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Permissions",
+            "description": "Resolved permission keys in `METHOD:/path` format",
+            "examples": [
+              [
+                "GET:/api/v1/documents",
+                "POST:/api/v1/documents/upload"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "roles",
+          "permissions"
+        ],
+        "title": "MeResponse",
+        "description": "Authenticated user's identity, roles, and permissions.",
+        "example": {
+          "id": "550e8400-e29b-41d4-a716-446655440000",
+          "permissions": [
+            "GET:/api/v1/documents",
+            "POST:/api/v1/documents/upload"
+          ],
+          "roles": [
+            "editor",
+            "viewer"
+          ],
+          "username": "jdoe"
+        }
+      },
+      "ReadyResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Always 'ready' when all dependencies are reachable",
+            "default": "ready",
+            "examples": [
+              "ready"
+            ]
+          },
+          "checks": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Checks",
+            "description": "Per-dependency health status.  Each key is a dependency name (e.g. 'database', 'chat_database') and each value is 'ok' or an error message.",
+            "examples": [
+              {
+                "chat_database": "ok",
+                "database": "ok"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "checks"
+        ],
+        "title": "ReadyResponse",
+        "description": "Response for the readiness probe (GET /ready).",
+        "example": {
+          "checks": {
+            "chat_database": "ok",
+            "database": "ok"
+          },
+          "status": "ready"
+        }
+      },
+      "RegisterRequest": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 3,
+            "title": "Username",
+            "description": "Desired username (3–100 characters, unique across the system)",
+            "examples": [
+              "jdoe"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 8,
+            "title": "Password",
+            "description": "Account password (minimum 8 characters)",
+            "examples": [
+              "my-secure-password"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "RegisterRequest",
+        "description": "New user registration payload.",
+        "example": {
+          "password": "my-secure-password",
+          "username": "jdoe"
+        }
+      },
+      "RejectRequest": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Reason",
+            "description": "Explanation for the rejection (1–2000 characters)",
+            "examples": [
+              "The policy references an outdated compliance standard (SOC 2 2019). Please update to SOC 2 2024."
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "RejectRequest",
+        "description": "Payload to reject a submitted document with a reason.",
+        "example": {
+          "reason": "The policy references an outdated compliance standard. Please update."
+        }
+      },
+      "ReviewCreateRequest": {
+        "properties": {
+          "grade": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Grade",
+            "description": "Numeric grade from 1 (worst) to 10 (best)",
+            "examples": [
+              8
+            ]
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Comment",
+            "description": "Written feedback explaining the grade (1–2000 characters)",
+            "examples": [
+              "Well-written policy with clear ownership. Minor formatting nits in §3.2."
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "grade",
+          "comment"
+        ],
+        "title": "ReviewCreateRequest",
+        "description": "Payload to submit a document review with a grade and comment.",
+        "example": {
+          "comment": "Well-written policy with clear ownership. Minor formatting nits.",
+          "grade": 8
+        }
+      },
+      "ReviewListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewResponse"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Review records for the current page"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total number of reviews for the document (across all pages)",
+            "examples": [
+              5
+            ]
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page",
+            "description": "Current page number (1-based)",
+            "examples": [
+              1
+            ]
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size",
+            "description": "Number of items per page (1–100)",
+            "examples": [
+              20
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "ReviewListResponse",
+        "description": "Paginated list of reviews for a document."
+      },
+      "ReviewResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "Unique review identifier",
+            "examples": [
+              "880e8400-e29b-41d4-a716-446655440003"
+            ]
+          },
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id",
+            "description": "UUID of the reviewed document",
+            "examples": [
+              "550e8400-e29b-41d4-a716-446655440000"
+            ]
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id",
+            "description": "UUID of the reviewer",
+            "examples": [
+              "770e8400-e29b-41d4-a716-446655440002"
+            ]
+          },
+          "grade": {
+            "type": "integer",
+            "title": "Grade",
+            "description": "Numeric grade from 1 (worst) to 10 (best)",
+            "examples": [
+              8
+            ]
+          },
+          "comment": {
+            "type": "string",
+            "title": "Comment",
+            "description": "Written review feedback"
+          },
+          "created_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created Date",
+            "description": "Timestamp when the review was submitted (UTC)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "document_id",
+          "user_id",
+          "grade",
+          "comment"
+        ],
+        "title": "ReviewResponse",
+        "description": "A document review as returned by the API.",
+        "example": {
+          "comment": "Well-written policy. Minor formatting nits.",
+          "created_date": "2026-07-02T15:00:00Z",
+          "document_id": "550e8400-e29b-41d4-a716-446655440000",
+          "grade": 8,
+          "id": "880e8400-e29b-41d4-a716-446655440003",
+          "user_id": "770e8400-e29b-41d4-a716-446655440002"
+        }
+      },
+      "RoleResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "Unique role identifier (UUID v4)",
+            "examples": [
+              "660e8400-e29b-41d4-a716-446655440001"
+            ]
+          },
+          "role_name": {
+            "type": "string",
+            "title": "Role Name",
+            "description": "Unique role name (e.g. 'admin', 'editor', 'viewer')",
+            "examples": [
+              "editor"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of what this role grants access to",
+            "examples": [
+              "Can view, edit, and submit documents for review"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "role_name"
+        ],
+        "title": "RoleResponse",
+        "description": "A security role definition.",
+        "example": {
+          "description": "Can view, edit, and submit documents for review",
+          "id": "660e8400-e29b-41d4-a716-446655440001",
+          "role_name": "editor"
+        }
+      },
+      "RunbookDeleteResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "description": "Human-readable confirmation message",
+            "examples": [
+              "Runbook deleted successfully"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "RunbookDeleteResponse",
+        "description": "Confirmation of a runbook deletion.",
+        "example": {
+          "detail": "Runbook deleted successfully"
+        }
+      },
+      "RunbookGenerateRequest": {
+        "properties": {
+          "document_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Document Ids",
+            "description": "List of document UUIDs to synthesize into a runbook (1–10 documents)",
+            "examples": [
+              [
+                "550e8400-e29b-41d4-a716-446655440000",
+                "660e8400-e29b-41d4-a716-446655440001"
+              ]
+            ]
+          },
+          "purpose": {
+            "$ref": "#/components/schemas/RunbookPurpose",
+            "description": "Intended use case — drives the structure and tone of the generated runbook"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "Optional custom title for the runbook (auto-generated if omitted)",
+            "examples": [
+              "SOC 2 Compliance Incident Response Runbook"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_ids",
+          "purpose"
+        ],
+        "title": "RunbookGenerateRequest",
+        "description": "Payload to trigger runbook generation from a set of documents.",
+        "example": {
+          "document_ids": [
+            "550e8400-e29b-41d4-a716-446655440000",
+            "660e8400-e29b-41d4-a716-446655440001"
+          ],
+          "purpose": "incident_response",
+          "title": "SOC 2 Compliance Incident Response Runbook"
+        }
+      },
+      "RunbookListItem": {
+        "properties": {
+          "runbook_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Runbook Id",
+            "description": "Unique runbook identifier"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "Runbook title"
+          },
+          "purpose": {
+            "$ref": "#/components/schemas/RunbookPurpose",
+            "description": "Purpose category"
+          },
+          "document_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Document Ids",
+            "description": "UUIDs of the source documents"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Generation status"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By",
+            "description": "UUID of the requesting user"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At",
+            "description": "Timestamp when the runbook was created (UTC)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "runbook_id",
+          "title",
+          "purpose",
+          "document_ids",
+          "status"
+        ],
+        "title": "RunbookListItem",
+        "description": "Lightweight runbook summary for list views (no generated content).",
+        "example": {
+          "created_at": "2026-07-03T10:00:00Z",
+          "created_by": "660e8400-e29b-41d4-a716-446655440001",
+          "document_ids": [
+            "550e8400-e29b-41d4-a716-446655440000",
+            "660e8400-e29b-41d4-a716-446655440001"
+          ],
+          "purpose": "incident_response",
+          "runbook_id": "990e8400-e29b-41d4-a716-446655440004",
+          "status": "completed",
+          "title": "SOC 2 Compliance Incident Response Runbook"
+        }
+      },
+      "RunbookListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RunbookListItem"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Runbook summaries for the current page"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total number of runbooks matching the query (across all pages)",
+            "examples": [
+              12
+            ]
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page",
+            "description": "Current page number (1-based)",
+            "examples": [
+              1
+            ]
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size",
+            "description": "Number of items per page (max 100)",
+            "examples": [
+              20
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "RunbookListResponse",
+        "description": "Paginated list of runbooks."
+      },
+      "RunbookPurpose": {
+        "type": "string",
+        "enum": [
+          "onboarding",
+          "incident_response",
+          "deployment",
+          "troubleshooting",
+          "training",
+          "other"
+        ],
+        "title": "RunbookPurpose",
+        "description": "Intended use case for the runbook — drives generation style and structure."
+      },
+      "RunbookResponse": {
+        "properties": {
+          "runbook_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Runbook Id",
+            "description": "Unique runbook identifier",
+            "examples": [
+              "990e8400-e29b-41d4-a716-446655440004"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "Runbook title",
+            "examples": [
+              "SOC 2 Compliance Incident Response Runbook"
+            ]
+          },
+          "purpose": {
+            "$ref": "#/components/schemas/RunbookPurpose",
+            "description": "Purpose category used for generation"
+          },
+          "document_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Document Ids",
+            "description": "UUIDs of the documents used as source material"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content",
+            "description": "Generated markdown content (null if generation failed or is still in progress)"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Generation status: 'pending', 'generating', 'completed', or 'failed'",
+            "examples": [
+              "completed"
+            ]
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message",
+            "description": "Error details if generation failed"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By",
+            "description": "UUID of the user who requested generation"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At",
+            "description": "Timestamp when the runbook was created (UTC)"
+          },
+          "modified_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modified Date",
+            "description": "Timestamp of the last modification (UTC)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "runbook_id",
+          "title",
+          "purpose",
+          "document_ids",
+          "status"
+        ],
+        "title": "RunbookResponse",
+        "description": "A generated runbook with full content and metadata.",
+        "example": {
+          "content": "# Incident Response Runbook\n\n## Overview\n...",
+          "created_at": "2026-07-03T10:00:00Z",
+          "created_by": "660e8400-e29b-41d4-a716-446655440001",
+          "document_ids": [
+            "550e8400-e29b-41d4-a716-446655440000",
+            "660e8400-e29b-41d4-a716-446655440001"
+          ],
+          "modified_date": "2026-07-03T10:00:00Z",
+          "purpose": "incident_response",
+          "runbook_id": "990e8400-e29b-41d4-a716-446655440004",
+          "status": "completed",
+          "title": "SOC 2 Compliance Incident Response Runbook"
+        }
+      },
+      "Status": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "pending_review",
+          "approved",
+          "rejected",
+          "expired",
+          "active",
+          "archived"
+        ],
+        "title": "Status",
+        "description": "Document lifecycle status.\n\nTransitions are enforced by the application service layer:\n\n- **DRAFT** → PENDING_REVIEW (on submit)\n- **PENDING_REVIEW** → APPROVED | REJECTED (on reviewer action)\n- **APPROVED** → EXPIRED (on expiry)\n- Any → ARCHIVED (on soft-delete)"
+      },
+      "TaskAcceptedResponse": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "task_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "message"
+        ],
+        "title": "TaskAcceptedResponse",
+        "description": "Returned when the operation was enqueued on Cloud Tasks."
+      },
+      "TokenResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token",
+            "description": "Signed JWT to include as `Authorization: Bearer <token>` in subsequent requests",
+            "examples": [
+              "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            ]
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "description": "Token type (always 'bearer')",
+            "default": "bearer",
+            "examples": [
+              "bearer"
+            ]
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In",
+            "description": "Token lifetime in seconds from the time of issuance",
+            "examples": [
+              3600
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "expires_in"
+        ],
+        "title": "TokenResponse",
+        "description": "JWT access token returned on successful login.",
+        "example": {
+          "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+          "expires_in": 3600,
+          "token_type": "bearer"
+        }
+      },
+      "UserListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/UserResponse"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "User records for the current page"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total number of users matching the query (across all pages)",
+            "examples": [
+              42
+            ]
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page",
+            "description": "Current page number (1-based)",
+            "examples": [
+              1
+            ]
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size",
+            "description": "Number of items per page",
+            "examples": [
+              50
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "UserListResponse",
+        "description": "Paginated list of users."
+      },
+      "UserResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "Unique user identifier (UUID v4)",
+            "examples": [
+              "550e8400-e29b-41d4-a716-446655440000"
+            ]
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "description": "Registered username",
+            "examples": [
+              "jdoe"
+            ]
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Roles",
+            "description": "Role names currently assigned to this user",
+            "examples": [
+              [
+                "editor",
+                "viewer"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "roles"
+        ],
+        "title": "UserResponse",
+        "description": "Summary of a user account — returned by admin endpoints.",
+        "example": {
+          "id": "550e8400-e29b-41d4-a716-446655440000",
+          "roles": [
+            "editor",
+            "viewer"
+          ],
+          "username": "jdoe"
+        }
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT access token obtained from POST /api/v1/auth/login.  Prefix the token value with nothing — just the raw JWT string."
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "system",
+      "description": "Health and readiness probes for load balancers and container orchestrators."
+    },
+    {
+      "name": "auth",
+      "description": "User registration, login, and session introspection. Public endpoints that do not require prior authentication."
+    },
+    {
+      "name": "admin",
+      "description": "User and role management.  **Requires admin-level permissions.**"
+    },
+    {
+      "name": "documents",
+      "description": "Document upload, metadata management, versioning, and approval workflow. All endpoints require authentication and role-based permissions."
+    },
+    {
+      "name": "approvals",
+      "description": "Pending-approval queue for reviewers and approvers."
+    },
+    {
+      "name": "reviews",
+      "description": "Document reviews with numeric grading and written feedback."
+    },
+    {
+      "name": "qa",
+      "description": "RAG-powered conversational Q&A.  Send a message and the assistant searches vectorized documents to compose an answer."
+    },
+    {
+      "name": "rag",
+      "description": "RAG ingestion and retrieval via Vertex AI RAG Engine. In production, ingestion tasks are enqueued via Cloud Tasks and processed asynchronously."
+    },
+    {
+      "name": "runbooks",
+      "description": "AI-generated structured markdown runbooks synthesised from collections of vectorized documents."
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ]
+}

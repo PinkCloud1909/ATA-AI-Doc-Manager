@@ -7,8 +7,9 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundError, ValidationError
 from app.modules.documents.domain.models import Document
+from app.modules.rag.domain.enums import RagIngestionStatus
 from app.modules.runbooks.application.runbook_service import RunbookService
-from app.modules.runbooks.domain.agent import active_document_ids, active_purpose
+from app.modules.runbooks.domain.agent import active_document_ids
 from app.modules.runbooks.domain.models import Runbook
 from app.shared.utils import utcnow
 
@@ -37,12 +38,17 @@ async def generate_runbook_task(
     if missing_ids:
         raise NotFoundError(f"Documents not found: {', '.join(missing_ids)}")
 
-    # Validate documents are vectorized
-    non_vectorized = [doc.title for doc in docs if not doc.is_vectorized]
-    if non_vectorized:
+    # Validate documents have been ingested into RAG
+    non_ingested = [
+        doc.title
+        for doc in docs
+        if doc.rag_ingestion_status != RagIngestionStatus.COMPLETED
+    ]
+    if non_ingested:
         raise ValidationError(
-            f"The following documents are not vectorized yet: {', '.join(non_vectorized)}. "
-            "Please approve and wait for vectorization before generating a runbook."
+            f"The following documents have not been ingested yet: "
+            f"{', '.join(non_ingested)}. "
+            "Please approve and wait for RAG ingestion before generating a runbook."
         )
 
     # Resolve title
@@ -66,9 +72,8 @@ async def generate_runbook_task(
     session.commit()
 
     # 3. Call the ADK service to generate the runbook
-    # We use contextvars to pass document_ids and purpose to the agent's tool
-    token_ids = active_document_ids.set([str(did) for did in document_ids])
-    token_purpose = active_purpose.set(purpose)
+    # We use contextvars to pass document_ids to the agent's tool
+    token_ids = active_document_ids.set(document_ids)
 
     session_id = str(uuid.uuid4())
     prompt = f"Please generate a technical runbook for the purpose '{purpose}' with the title '{resolved_title}' using the selected documents."
@@ -95,7 +100,6 @@ async def generate_runbook_task(
         runbook.error_message = str(exc)
     finally:
         active_document_ids.reset(token_ids)
-        active_purpose.reset(token_purpose)
 
     runbook.modified_date = utcnow()
     session.commit()

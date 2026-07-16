@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, patch
 
 
 from app.modules.documents.domain.models import Document
+from app.modules.rag.domain.enums import RagIngestionStatus
 from app.modules.runbooks.domain.models import Runbook
 from app.shared.enums import DocumentType, Status
 from app.shared.utils import utcnow
@@ -21,20 +22,21 @@ def _auth_header(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _create_vectorized_document(db_session, user_id=None) -> Document:
+def _create_ingested_document(db_session, user_id=None) -> Document:
     now = utcnow()
     doc = Document(
         document_group_id=uuid.uuid4(),
         version=1,
         document_type=DocumentType.REPORT,
         status=Status.APPROVED,
-        title="Vectorized Test Document",
-        description="A test document that is vectorized",
+        title="Ingested Test Document",
+        description="A test document that has been RAG ingested",
         original_filename="test.pdf",
-        file_link="minio://documents/test.pdf",
+        file_link="gcs://test-bucket/documents/test.pdf",
         file_size=1024,
         content_type="application/pdf",
-        is_vectorized=True,
+        rag_ingestion_status=RagIngestionStatus.COMPLETED,
+        rag_ingested_at=now,
         created_by=user_id,
         created_at=now,
         modified_by=user_id,
@@ -45,20 +47,20 @@ def _create_vectorized_document(db_session, user_id=None) -> Document:
     return doc
 
 
-def _create_unvectorized_document(db_session, user_id=None) -> Document:
+def _create_not_ingested_document(db_session, user_id=None) -> Document:
     now = utcnow()
     doc = Document(
         document_group_id=uuid.uuid4(),
         version=1,
         document_type=DocumentType.REPORT,
         status=Status.DRAFT,
-        title="Unvectorized Test Document",
-        description="A test document that is not vectorized",
+        title="Not Ingested Test Document",
+        description="A test document that is not RAG ingested",
         original_filename="test.pdf",
-        file_link="minio://documents/test.pdf",
+        file_link="gcs://test-bucket/documents/test.pdf",
         file_size=1024,
         content_type="application/pdf",
-        is_vectorized=False,
+        rag_ingestion_status=RagIngestionStatus.NOT_INGESTED,
         created_by=user_id,
         created_at=now,
         modified_by=user_id,
@@ -71,7 +73,7 @@ def _create_unvectorized_document(db_session, user_id=None) -> Document:
 
 class TestGenerateRunbook:
     def test_generate_runbook_success(self, client, db_session):
-        doc = _create_vectorized_document(db_session)
+        doc = _create_ingested_document(db_session)
         token = _login_admin(client)
 
         mock_content = "# Generated Runbook\n\nThis is a mock onboarding runbook."
@@ -101,7 +103,7 @@ class TestGenerateRunbook:
         assert payload["document_ids"] == [str(doc.id)]
 
     def test_generate_runbook_unvectorized_fails(self, client, db_session):
-        doc = _create_unvectorized_document(db_session)
+        doc = _create_not_ingested_document(db_session)
         token = _login_admin(client)
 
         response = client.post(
@@ -114,7 +116,7 @@ class TestGenerateRunbook:
         )
 
         assert response.status_code == 422
-        assert "not vectorized yet" in response.json()["detail"]
+        assert "not been ingested yet" in response.json()["detail"]
 
     def test_generate_runbook_missing_document_fails(self, client, db_session):
         token = _login_admin(client)

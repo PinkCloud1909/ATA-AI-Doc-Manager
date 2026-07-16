@@ -1,19 +1,44 @@
+"""Runbook generation agent using Google ADK.
+
+The agent exposes a single tool — ``search_knowledge_for_runbook`` — that
+retrieves top-k semantically-similar text chunks from the RAG Engine,
+optionally filtered to specific document IDs.  Results are enriched with
+document titles.
+
+State passing via contextvars
+-----------------------------
+Document IDs are passed from the service layer to the tool function via
+:mod:`contextvars`.  This is safe because:
+
+1. Each FastAPI request runs in its own asyncio Task.
+2. Python ``ContextVar`` values are isolated per asyncio Task — setting a value
+   in one request's Task never affects another concurrent request.
+3. The values are set synchronously in ``generate_runbook_task()`` before the
+   first ``await`` point that could yield control to another Task.
+
+If the pattern ever needs to change (e.g. multi-threaded deployment), replace
+with ADK session state or an explicit tool-factory per request.
+"""
+
 import contextvars
 import logging
+from uuid import UUID
 
 from google.adk.agents.llm_agent import Agent
 from google.adk.tools import FunctionTool
+from google.genai import types
 
-from app.shared.adapters.factory import get_llm_provider, get_vector_store
+from app.core.config import get_settings
+from app.modules.rag.application.retrieval import retrieve_chunks
 
 logger = logging.getLogger(__name__)
 
-# Context variables to hold state during runbook generation
-active_document_ids: contextvars.ContextVar[list[str]] = contextvars.ContextVar(
+_settings = get_settings()
+
+# Context variable for per-request document scope isolation.
+# See module docstring for thread-safety rationale.
+active_document_ids: contextvars.ContextVar[list[UUID]] = contextvars.ContextVar(
     "active_document_ids", default=[]
-)
-active_purpose: contextvars.ContextVar[str] = contextvars.ContextVar(
-    "active_purpose", default="onboarding"
 )
 
 
@@ -21,49 +46,35 @@ def search_knowledge_for_runbook(query: str, top_k: int = 10) -> str:
     """Search the document knowledge base for information relevant to the runbook.
 
     Args:
-        query: The natural-language search query.
-        top_k: Number of document chunks to retrieve (default 10).
+        query:  The natural-language search query.
+        top_k:  Number of document chunks to retrieve (default 10).
 
     Returns:
         A formatted string with the retrieved text chunks and their source
-        metadata. Returns a warning message when no relevant chunks are found.
+        metadata.  Returns a warning message when no relevant chunks are found.
     """
     try:
-        llm = get_llm_provider()
-        vector_store = get_vector_store()
-
-        query_embeddings = llm.generate_embeddings(
-            [query],
-            task_type="QUESTION_ANSWERING",
-        )
-        if not query_embeddings:
-            return "Could not generate query embedding."
-
-        query_embedding = query_embeddings[0]
-
-        # Fetch document filter from context
         doc_ids = active_document_ids.get()
-
-        results = vector_store.semantic_search(
-            query_embedding,
+        results = retrieve_chunks(
+            query=query,
             top_k=top_k,
-            filter_document_ids=doc_ids if doc_ids else None,
+            document_ids=doc_ids if doc_ids else None,
         )
 
         if not results:
             return "No relevant information found in the specified documents for that query."
 
         parts: list[str] = []
-        for i, result in enumerate(results, start=1):
-            meta = result.get("metadata", {})
-            title = meta.get("title", "Unknown document")
-            chunk_idx = meta.get("chunk_index", "?")
-            score = result.get("score")
-            score_str = f"{score:.4f}" if isinstance(score, float) else "n/a"
-            text = result.get("text", "")
+        for i, chunk in enumerate(results, start=1):
+            title = chunk.document_title or chunk.source_uri or "Unknown document"
+            score_str = (
+                f"{chunk.score:.4f}"
+                if isinstance(chunk.score, float)
+                else "n/a"
+            )
             parts.append(
-                f"[Chunk {i}] Source: '{title}' (chunk #{chunk_idx}, similarity: {score_str})\n"
-                f"{text}"
+                f"[Chunk {i}] Source: '{title}' (similarity: {score_str})\n"
+                f"{chunk.text}"
             )
 
         logger.debug(
@@ -77,9 +88,9 @@ def search_knowledge_for_runbook(query: str, top_k: int = 10) -> str:
         return f"An error occurred while searching the knowledge base: {exc}"
 
 
-# The runbook generator agent
+# The runbook generator agent.
 runbook_agent = Agent(
-    model="gemini-2.0-flash",
+    model=_settings.llm_model,
     name="runbook_generator",
     description="An agent that synthesizes technical runbooks and guides from document content.",
     instruction="""You are an expert technical writer and systems engineer.
@@ -106,4 +117,12 @@ The runbook should be structured as follows:
 - Format all instructions, commands, and code blocks clearly.
 """,
     tools=[FunctionTool(search_knowledge_for_runbook)],
+    generate_content_config=types.GenerateContentConfig(
+        http_options=types.HttpOptions(
+            retry_options=types.HttpRetryOptions(
+                initial_delay=1.0,
+                attempts=3,
+            ),
+        ),
+    ),
 )

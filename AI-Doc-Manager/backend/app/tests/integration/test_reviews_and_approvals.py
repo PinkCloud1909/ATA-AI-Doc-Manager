@@ -18,7 +18,7 @@ def _create_document(db_session, *, group_id, version, status, created_by):
         status=status,
         title="Test Document",
         original_filename="sample.pdf",
-        file_link="minio://documents/sample.pdf",
+        file_link="gcs://test-bucket/documents/sample.pdf",
         created_by=created_by,
         created_at=utcnow(),
     )
@@ -65,10 +65,21 @@ def test_submit_and_approve_expires_previous(client, db_session):
     assert submit_response.status_code == 200
     assert submit_response.json()["status"] == Status.PENDING_REVIEW
 
-    approve_response = client.post(
-        f"/api/v1/documents/{draft_doc.id}/approve",
-        headers=headers,
-    )
+    # RAG ingestion runs synchronously on approve in local mode —
+    # mock it so the test does not call the real RAG Engine.
+    from unittest.mock import patch
+    from app.modules.rag.application.services import IngestionResult
+
+    with patch(
+        "app.modules.rag.application.services.ingest_document",
+        return_value=IngestionResult(
+            document_id=draft_doc.id, status="completed", message="mocked"
+        ),
+    ):
+        approve_response = client.post(
+            f"/api/v1/documents/{draft_doc.id}/approve",
+            headers=headers,
+        )
     assert approve_response.status_code == 200
     assert approve_response.json()["status"] == Status.APPROVED
 
