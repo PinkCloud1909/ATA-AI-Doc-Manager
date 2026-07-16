@@ -1,61 +1,84 @@
-"use client"
+"use client";
 
-import { useCallback } from "react"
-import axios from "axios"
-import { useChatStore } from "@/stores/chatStore"
-import { qaApi } from "@/lib/api/chat"
+import { useCallback } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { chatApi } from "@/lib/api/chat";
+import { useChatStore } from "@/stores/chatStore";
+import type { ChatRequest } from "@/types/chat";
+import { v4 as uuid } from "uuid";
+import axios from "axios";
 
 function getChatErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
-    const data = error.response?.data as { detail?: string } | undefined
-    return data?.detail ?? error.message
+    const data = error.response?.data as { detail?: string } | undefined;
+    return data?.detail ?? error.message;
   }
-
-  return error instanceof Error ? error.message : "Không thể kết nối chatbot."
+  return error instanceof Error ? error.message : "Không thể kết nối chatbot.";
 }
 
 export function useChat() {
-  const store = useChatStore()
+  const store = useChatStore();
+
+  const chatMutation = useMutation({
+    mutationFn: (payload: ChatRequest) => chatApi.sendMessage(payload),
+  });
 
   const sendMessage = useCallback(
     async (content: string) => {
-      if (store.isStreaming) return
+      if (store.isStreaming) return;
 
-      store.addUserMessage(content)
-      const assistantId = store.startAssistantMessage()
+      // Add user message
+      store.addMessage({
+        id: uuid(),
+        role: "user",
+        content,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Start assistant placeholder
+      const assistantId = uuid();
+      store.addMessage({
+        id: assistantId,
+        role: "assistant",
+        content: "",
+        timestamp: new Date().toISOString(),
+        is_streaming: true,
+      });
+      store.setStreaming(true);
 
       try {
-        store.setStreaming(true)
-        const response = await qaApi.chat({
+        const result = await chatMutation.mutateAsync({
           message: content,
           session_id: store.sessionId,
-        })
+        });
 
-        // Set the full response at once since it's non-streaming
-        store.appendToken(assistantId, response.response)
-        store.finalizeMessage(assistantId, [], false) // No sources for now
-        store.setStreaming(false)
+        // Update session ID if changed
+        if (result.session_id && result.session_id !== store.sessionId) {
+          store.setSessionId(result.session_id);
+        }
+
+        // Replace the streaming placeholder with the final content
+        store.updateMessage(assistantId, {
+          content: result.response,
+          is_streaming: false,
+        });
       } catch (error) {
-        console.error("Chat error:", error)
-        store.appendToken(assistantId, getChatErrorMessage(error))
-        store.finalizeMessage(assistantId, [], false)
-        store.setStreaming(false)
+        store.updateMessage(assistantId, {
+          content: getChatErrorMessage(error),
+          is_streaming: false,
+        });
+      } finally {
+        store.setStreaming(false);
       }
     },
-    [store],
-  )
-
-  const stopStreaming = useCallback(() => {
-    store.setStreaming(false)
-  }, [store])
+    [store, chatMutation],
+  );
 
   return {
-    messages:          store.messages,
-    isStreaming:       store.isStreaming,
-    sessionId:         store.sessionId,
+    messages: store.messages,
+    isStreaming: store.isStreaming,
+    sessionId: store.sessionId,
     sendMessage,
-    stopStreaming,
-    clearConversation: store.clearConversation,
-    newSession:        store.newSession,
-  }
+    clearConversation: store.clearMessages,
+  };
 }

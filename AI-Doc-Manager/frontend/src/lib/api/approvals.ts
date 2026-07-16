@@ -1,20 +1,16 @@
-import apiClient from "./client"
-import { DocumentListItem } from "@/types/document"
+/**
+ * lib/api/approvals.ts
+ *
+ * Backend endpoints:
+ *  GET /api/v1/approvals/pending → ApprovalQueueItem[]
+ */
+
+import apiClient from "./client";
+import type { ApprovalQueueItem } from "@/types/document";
 
 export const approvalsApi = {
-  getPendingQueue: async (): Promise<DocumentListItem[]> => {
-    const { data } = await apiClient.get<DocumentListItem[] | { items: DocumentListItem[] }>(
-      "/documents",
-      {
-        params: { status: "PENDING_REVIEW", page_size: 100 },
-      },
-    )
-
-    return Array.isArray(data) ? data : data.items
+  pending: async (): Promise<ApprovalQueueItem[]> => {
+    const { data } = await apiClient.get<ApprovalQueueItem[]>("/approvals/pending");
+    return data;
   },
-
-  submit:  async (id: string)              => apiClient.post(`/documents/${id}/submit`),
-  approve: async (id: string)              => apiClient.post(`/documents/${id}/approve`),
-  reject:  async (id: string, reason: string) =>
-    apiClient.post(`/documents/${id}/reject`, { reason }),
-}
+};

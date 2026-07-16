@@ -1,8 +1,8 @@
-import { useMemo } from "react"
-import { useAuthStore } from "@/stores/authStore"
+import { useMemo } from "react";
+import { useAuthStore } from "@/stores/authStore";
 
 export function usePermission() {
-  const user = useAuthStore((s) => s.user)
+  const user = useAuthStore((s) => s.user);
 
   return useMemo(() => {
     if (!user) {
@@ -12,39 +12,32 @@ export function usePermission() {
         canApprove: false,
         canAdmin: false,
         roleNames: [] as string[],
-      }
+      };
     }
 
-    const roleNames = [
-      ...(user.roles ?? [])
-        .map((role) =>
-          typeof role === "string" ? role : role.role?.role_name ?? "",
-        ),
-      user.role ?? "",
-    ].filter(Boolean)
-    const normalizedRoleNames = roleNames.map((role) => role.toLowerCase())
-    const normalizedPermissions = (user.permissions ?? []).map((permission) =>
-      permission.toLowerCase(),
-    )
-    const hasRole = (...roles: string[]) =>
-      normalizedRoleNames.some((role) => roles.includes(role))
-    const hasPermission = (...permissions: string[]) =>
-      normalizedPermissions.some((permission) => permissions.includes(permission))
+    // API returns roles and permissions as flat string arrays
+    const roles = (user.roles ?? []).map((r) => r.toLowerCase());
+    const perms = (user.permissions ?? []).map((p) => p.toLowerCase());
+
+    const hasRole = (...targets: string[]) =>
+      targets.some((t) => roles.includes(t));
+    const hasPermission = (...targets: string[]) =>
+      targets.some((t) => perms.includes(t));
 
     return {
-      roleNames,
+      roleNames: user.roles ?? [],
       canUpload:
-        hasRole("admin", "uploader", "editor") ||
-        hasPermission("write", "upload", "post:/api/v1/documents/upload"),
+        hasRole("admin", "editor") ||
+        hasPermission("post:/api/v1/documents/upload"),
       canReview:
-        hasRole("admin", "reviewer", "approver") ||
-        hasPermission("review", "get:/api/v1/approvals/pending"),
+        hasRole("admin", "reviewer") ||
+        hasPermission("get:/api/v1/approvals/pending"),
       canApprove:
-        hasRole("admin", "reviewer", "approver") ||
-        hasPermission("approve", "post:/api/v1/documents/{document_id}/approve"),
+        hasRole("admin", "reviewer") ||
+        hasPermission("post:/api/v1/documents/{document_id}/approve"),
       canAdmin:
         hasRole("admin") ||
-        hasPermission("manage_users", "get:/api/v1/admin/users"),
-    }
-  }, [user])
+        hasPermission("get:/api/v1/admin/users"),
+    };
+  }, [user]);
 }
