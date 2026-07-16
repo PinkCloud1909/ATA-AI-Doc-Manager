@@ -32,7 +32,7 @@
 │  │  (IAM/JWT)   │    ▼                             ▼            │
 │  └──────────────┘  ┌──────────────┐    ┌──────────────────┐    │
 │                    │  PostgreSQL   │    │  Vertex AI       │    │
-│  ┌──────────────┐  │  (Cloud SQL) │    │  Vector Search   │    │
+│  ┌──────────────┐  │  (Cloud SQL) │    │  RAG Engine      │    │
 │  │  Google      │  └──────────────┘    └──────────────────┘    │
 │  │  Cloud       │                                               │
 │  │  Storage     │                                               │
@@ -49,7 +49,7 @@
 | Backend | FastAPI + Google ADK | Cloud Run |
 | LLM | Gemini (via Vertex AI) | `gemini-1.5-pro` |
 | Relational DB | PostgreSQL (Cloud SQL) | Quản lý metadata |
-| Vector DB | Vertex AI Vector Search | Semantic search tài liệu |
+| Vector DB | Google Cloud RAG Engine | Semantic search tài liệu |
 | Object Storage | Google Cloud Storage | Lưu file docx/pdf |
 
 ---
@@ -187,21 +187,16 @@ lib/api/documents.ts     ← upload = 3-step flow, getDownloadUrl
 hooks/useDocuments.ts    ← thêm stage tracking, useDownloadUrl
 components/UploadForm    ← step indicator (signing/uploading/confirming)
 components/[id]/page     ← download button dùng Signed URL
-types/document.ts        ← thêm original_filename, size_bytes, vertex_index_id
+types/document.ts        ← thêm original_filename, size_bytes, rag_corpus_file_id
 ```
 
-### 3.3 Vector Search: ChromaDB → Vertex AI
+### 3.3 Vector Search: Google Cloud RAG Engine
 
-Frontend không gọi Vertex AI trực tiếp (backend xử lý), nhưng response thay đổi:
-
-| | Cũ (ChromaDB) | Mới (Vertex AI) |
-|---|---|---|
-| Relevance field | `relevance_score` (0-1) | `vertex_distance` (cosine) + `relevance_score` |
-| Source display | `document_id` + `file_link` | `document_id` + `gcs_path` + `original_filename` |
+Frontend không gọi RAG Engine trực tiếp (backend xử lý). Backend sử dụng Google Cloud RAG Engine làm vector store duy nhất.
 
 **File thay đổi:**
 ```
-types/chat.ts            ← thêm vertex_distance, gcs_path, original_filename
+types/chat.ts            ← response format từ RAG Engine semantic_search_text
 components/SourceCitation← hiển thị mini relevance bar từ vertex_distance
 ```
 
@@ -293,7 +288,7 @@ User gửi tin nhắn
    → WS onopen → send message
    
 Backend (FastAPI + Google ADK):
-   → Vertex AI Vector Search: tìm top-k tài liệu APPROVED
+   → RAG Engine: tìm top-k tài liệu APPROVED
    → Nếu có kết quả: RAG với Gemini
    → Nếu không có: Gemini trực tiếp
    → Stream token-by-token qua WS
