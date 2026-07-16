@@ -20,6 +20,9 @@ Thumbs.db
 *.launch
 .settings/
 *.sublime-workspace
+.claude/
+.codex/
+.codex-pet-runs/
 
 # Dependencies
 node_modules/

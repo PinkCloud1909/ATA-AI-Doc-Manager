@@ -1,12 +1,12 @@
 # AI-Doc-Manager
 
-This repository contains the project source inside the `AI-Doc-Manager/` directory.
+This directory contains the project source.
 
 Current status:
 
-- The backend can be run with Docker Compose from `AI-Doc-Manager/backend/`.
+- The backend can be run with Docker Compose from `backend/`.
 - PostgreSQL and MinIO are included in the backend Docker Compose stack.
-- The frontend in `AI-Doc-Manager/frontend/` is currently incomplete on `master`, so the root Docker Compose stack should not be used yet.
+- The frontend in `frontend/` is currently incomplete on `master`, so the root Docker Compose stack should not be used yet.
 
 ## Prerequisites
 
@@ -24,10 +24,10 @@ If this command returns a Docker engine connection error, open Docker Desktop an
 
 ## Run The Backend
 
-From the repository root:
+From this directory:
 
 ```powershell
-cd AI-Doc-Manager/backend
+cd backend
 ```
 
 Create the local environment file if it does not exist:
@@ -68,7 +68,7 @@ password: admin123
 
 ## Common Commands
 
-Run these commands from `AI-Doc-Manager/backend/`.
+Run these commands from `backend/`.
 
 Check containers:
 
@@ -108,7 +108,7 @@ docker compose down -v
 
 ## Important Note About The Root Compose File
 
-Do not run this from `AI-Doc-Manager/` on `master` yet:
+Do not run this from this directory on `master` yet:
 
 ```powershell
 docker compose up --build
@@ -119,14 +119,14 @@ The root Compose file includes the frontend service, but the frontend on `master
 For backend-only development, always run Docker Compose from:
 
 ```text
-AI-Doc-Manager/backend/
+backend/
 ```
 
 ## Run The Backend Without Docker
 
 Use this only if you already have PostgreSQL and MinIO running locally.
 
-From `AI-Doc-Manager/backend/`:
+From `backend/`:
 
 ```powershell
 python -m venv .venv
