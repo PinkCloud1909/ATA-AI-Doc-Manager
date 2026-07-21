@@ -20,7 +20,7 @@ def _login(client, username: str, password: str) -> str:
 
 
 def _admin_token(client) -> str:
-    return _login(client, "admin", "admin123")
+    return _login(client, "admin", "Admin123!")
 
 
 def _create_user_with_roles(client, username: str, roles: list[str]) -> str:
@@ -29,12 +29,12 @@ def _create_user_with_roles(client, username: str, roles: list[str]) -> str:
         headers=_auth_header(_admin_token(client)),
         json={
             "username": username,
-            "password": "password123",
+            "password": "Password123!",
             "role_names": roles,
         },
     )
     assert response.status_code == 201
-    return _login(client, username, "password123")
+    return _login(client, username, "Password123!")
 
 
 def _admin_user(db_session) -> User:
@@ -79,7 +79,7 @@ def test_admin_can_manage_users_and_roles(client):
         headers=_auth_header(token),
         json={
             "username": "reviewer01",
-            "password": "password123",
+            "password": "Password123!",
             "role_names": ["reviewer"],
         },
     )

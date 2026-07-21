@@ -36,8 +36,17 @@ from app.modules.documents.application.services import (
     average_grade,
     create_document,
     create_new_version,
+<<<<<<< Updated upstream
     get_document_by_id,
     get_document_versions,
+=======
+    delete_document_permanently,
+    expire_document,
+    get_document_detail,
+    get_review_summary,
+    get_review_summaries,
+    get_user_display_names,
+>>>>>>> Stashed changes
     list_documents,
     list_pending_approvals,
     mark_document_expired,
@@ -416,8 +425,37 @@ def get_all_documents(
         page=page,
         page_size=page_size,
     )
+<<<<<<< Updated upstream
     return PaginatedDocumentsResponse(
         items=[_build_list_response(doc, session) for doc in documents],
+=======
+    creator_names = get_user_display_names(
+        session, {document.created_by for document in documents}
+    )
+    review_summaries = get_review_summaries(
+        session, {document.id for document in documents}
+    )
+    return DocumentListResponse(
+        items=[
+            DocumentListItem(
+                document_id=doc.id,
+                document_group_id=doc.document_group_id,
+                version=doc.version,
+                title=doc.title,
+                original_filename=doc.original_filename,
+                document_type=doc.document_type,
+                status=doc.status,
+                file_size=doc.file_size,
+                content_type=doc.content_type,
+                created_by=doc.created_by,
+                created_by_name=creator_names.get(doc.created_by),
+                created_at=doc.created_at,
+                average_review_grade=review_summaries.get(doc.id, (None, 0))[0],
+                review_count=review_summaries.get(doc.id, (None, 0))[1],
+            )
+            for doc in documents
+        ],
+>>>>>>> Stashed changes
         total=total,
         page=page,
         page_size=page_size,
@@ -434,6 +472,7 @@ def get_document_detail(
     current_user: Annotated[AuthenticatedUser, Depends(require_permission())],
     session: Annotated[Session, Depends(get_db_session)],
 ) -> DocumentDetailResponse:
+<<<<<<< Updated upstream
     document = get_document_by_id(session, document_id)
     _ensure_can_view_document(current_user, document)
     return _build_detail_response(document, session)
@@ -472,6 +511,56 @@ def download_document(
         path=target,
         filename=document.original_filename,
         media_type=document.content_type or "application/octet-stream",
+=======
+    document, preview_url, download_url = get_document_detail(
+        session, document_id, storage
+    )
+    actor_names = get_user_display_names(
+        session,
+        {
+            document.created_by,
+            document.modified_by,
+            document.submitted_by,
+            document.approved_by,
+            document.rejected_by,
+        },
+    )
+    average_review_grade, review_count = get_review_summary(session, document.id)
+    return DocumentDetailResponse(
+        document_id=document.id,
+        document_group_id=document.document_group_id,
+        version=document.version,
+        title=document.title,
+        description=document.description,
+        original_filename=document.original_filename,
+        document_type=document.document_type,
+        status=document.status,
+        file_size=document.file_size,
+        content_type=document.content_type,
+        download_url=download_url,
+        preview_url=preview_url,
+        rag_ingestion_status=document.rag_ingestion_status.value,
+        rag_ingestion_error=document.rag_ingestion_error,
+        rag_ingested_at=document.rag_ingested_at,
+        created_by=document.created_by,
+        created_by_name=actor_names.get(document.created_by),
+        created_at=document.created_at,
+        modified_by=document.modified_by,
+        modified_by_name=actor_names.get(document.modified_by),
+        modified_date=document.modified_date,
+        submitted_by=document.submitted_by,
+        submitted_by_name=actor_names.get(document.submitted_by),
+        submitted_at=document.submitted_at,
+        approved_by=document.approved_by,
+        approved_by_name=actor_names.get(document.approved_by),
+        approved_at=document.approved_at,
+        rejected_by=document.rejected_by,
+        rejected_by_name=actor_names.get(document.rejected_by),
+        rejected_reason=document.rejected_reason,
+        rejected_at=document.rejected_at,
+        average_review_grade=average_review_grade,
+        review_count=review_count,
+>>>>>>> Stashed changes
     )
 
 
@@ -678,16 +767,27 @@ def pending_approvals(
     session: Annotated[Session, Depends(get_db_session)],
 ) -> list[ApprovalQueueItem]:
     documents = list_pending_approvals(session)
+    user_names = get_user_display_names(
+        session,
+        {
+            user_id
+            for document in documents
+            for user_id in (document.created_by, document.submitted_by)
+        },
+    )
     return [
         ApprovalQueueItem(
             document_id=document.id,
             document_group_id=document.document_group_id,
             version=document.version,
+            title=document.title,
             document_type=document.document_type,
             status=document.status,
             created_by=document.created_by,
+            created_by_name=user_names.get(document.created_by),
             created_at=document.created_at,
             submitted_by=document.submitted_by,
+            submitted_by_name=user_names.get(document.submitted_by),
             submitted_at=document.submitted_at,
         )
         for document in documents

@@ -5,6 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.core.db import Base, get_db_session
+from app.modules import model_registry as _model_registry  # noqa: F401
 from app.main import app
 from app.modules.iam.application.seed import seed_iam_data
 

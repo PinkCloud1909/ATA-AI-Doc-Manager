@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     cloud_sql_db_name: str | None = None
 
     default_admin_username: str = Field(default="admin", max_length=100)
-    default_admin_password: str = Field(default="admin123", min_length=8)
+    default_admin_password: str = Field(default="Admin123!", min_length=8)
     default_admin_role_name: str = Field(default="admin", max_length=50)
     default_user_role_name: str = Field(default="user", max_length=50)
 

@@ -19,6 +19,7 @@ export default function AdminRolesPage() {
   })
 
   return (
+<<<<<<< Updated upstream
     <main className="h-full overflow-y-auto p-8">
       <div className="mx-auto max-w-6xl space-y-6">
         <div>
@@ -26,6 +27,68 @@ export default function AdminRolesPage() {
           <p className="mt-1 text-sm text-slate-500">
             Danh sách role và endpoint privilege đang được backend enforce.
           </p>
+=======
+    <div className="mx-auto w-full max-w-5xl px-4 py-8 md:px-8">
+      <div className="mb-10">
+        <h1 className="text-4xl font-black tracking-tight text-on-surface md:text-5xl">
+          {t.admin.rolesList}
+        </h1>
+        <p className="mt-4 text-lg text-on-surface-variant">
+          {t.admin.rolesDescription}
+        </p>
+      </div>
+
+      <section className="overflow-hidden border border-outline-variant/10 bg-white shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left">
+            <thead className="border-b border-outline-variant/10 bg-surface-bright text-sm uppercase tracking-wide text-on-surface-variant">
+              <tr>
+                <th className="px-6 py-5 font-bold">{t.admin.role}</th>
+                <th className="px-6 py-5 font-bold">Description</th>
+                <th className="px-6 py-5 font-bold">Permissions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-outline-variant/10">
+              {roles && roles.length > 0 ? (
+                roles.map((role) => (
+                  <tr key={role.id} className="transition-colors hover:bg-surface-bright">
+                    <td className="px-6 py-5 text-base font-semibold text-on-surface">
+                      {role.role_name}
+                    </td>
+                    <td className="px-6 py-5 text-base text-on-surface-variant">
+                      {role.description || "—"}
+                    </td>
+                    <td className="px-6 py-5">
+                      <details className="group">
+                        <summary className="cursor-pointer list-none text-sm font-semibold text-tertiary hover:underline">
+                          {role.permissions.length} permissions
+                          <span className="material-symbols-outlined ml-1 align-middle text-[18px] transition-transform group-open:rotate-180">expand_more</span>
+                        </summary>
+                        <ul className="mt-3 max-h-64 space-y-2 overflow-y-auto rounded-lg bg-surface-container-low p-3">
+                          {role.permissions.length > 0 ? role.permissions.map((permission) => {
+                            const [method, ...pathParts] = permission.split(":");
+                            return (
+                              <li key={permission} className="flex items-start gap-2 text-xs">
+                                <span className="min-w-14 rounded bg-white px-2 py-1 text-center font-black text-tertiary">{method}</span>
+                                <span className="break-all py-1 text-on-surface-variant">{pathParts.join(":")}</span>
+                              </li>
+                            );
+                          }) : <li className="text-xs text-on-surface-variant">No permissions assigned.</li>}
+                        </ul>
+                      </details>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={3} className="px-6 py-12 text-center text-sm text-on-surface-variant">
+                    {t.common.noResults}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+>>>>>>> Stashed changes
         </div>
 
         {error && (

@@ -7,17 +7,25 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db_session
 from app.core.dependencies import require_permission
 from app.modules.iam.api.schemas import (
+<<<<<<< Updated upstream
     AdminUserCreateRequest,
     AssignRolesRequest,
     LoginRequest,
     MeResponse,
     PrivilegeResponse,
+=======
+    ChangePasswordRequest,
+    LoginRequest,
+    MeResponse,
+    PasswordChangeResponse,
+>>>>>>> Stashed changes
     RegisterRequest,
     RoleResponse,
     TokenResponse,
     UserRoleResponse,
 )
 from app.modules.iam.application.services import (
+<<<<<<< Updated upstream
     assign_roles_to_user,
     create_user,
     issue_access_token,
@@ -26,6 +34,12 @@ from app.modules.iam.application.services import (
     register_user,
 )
 from app.modules.iam.infrastructure.repositories import get_user_by_id
+=======
+    change_password,
+    issue_access_token,
+    register_user,
+)
+>>>>>>> Stashed changes
 from app.modules.iam.domain.principal import AuthenticatedUser
 from app.shared.utils import utcnow
 
@@ -193,6 +207,7 @@ def admin_create_user(
         role_names=payload.role_names,
         created_by=current_user.id,
     )
+<<<<<<< Updated upstream
     return _build_me_response(user)
 
 
@@ -214,3 +229,28 @@ def admin_assign_roles(
         assigned_by=current_user.id,
     )
     return _build_me_response(user)
+=======
+
+
+@router.post(
+    "/change-password",
+    response_model=PasswordChangeResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Change the current user's password",
+    responses={
+        422: {"description": "Current password is incorrect or the new password violates policy"},
+    },
+)
+def change_current_password(
+    payload: ChangePasswordRequest,
+    current_user: Annotated[AuthenticatedUser, Depends(require_permission())],
+    session: Annotated[Session, Depends(get_db_session)],
+) -> PasswordChangeResponse:
+    change_password(
+        session,
+        user_id=current_user.id,
+        current_password=payload.current_password,
+        new_password=payload.new_password,
+    )
+    return PasswordChangeResponse(detail="Password changed successfully")
+>>>>>>> Stashed changes

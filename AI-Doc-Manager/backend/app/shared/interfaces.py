@@ -24,7 +24,18 @@ class IObjectStorage(ABC):
         pass
 
     @abstractmethod
+<<<<<<< Updated upstream
     def generate_presigned_download_url(self, object_reference: str, expires: Optional[timedelta] = None) -> str:
+=======
+    def generate_presigned_download_url(
+        self,
+        object_reference: str,
+        expires: timedelta | None = None,
+        *,
+        response_disposition: str | None = None,
+        content_type: str | None = None,
+    ) -> str:
+>>>>>>> Stashed changes
         pass
 
     @abstractmethod

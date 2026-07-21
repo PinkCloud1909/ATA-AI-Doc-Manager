@@ -10,9 +10,74 @@ class ReviewCreateRequest(BaseModel):
 
 
 class ReviewResponse(BaseModel):
+<<<<<<< Updated upstream
     id: UUID
     document_id: UUID
     user_id: UUID
     grade: int
     comment: str
     created_date: datetime | None = None
+=======
+    """A document review as returned by the API."""
+
+    id: UUID = Field(
+        description="Unique review identifier",
+        examples=["880e8400-e29b-41d4-a716-446655440003"],
+    )
+    document_id: UUID = Field(
+        description="UUID of the reviewed document",
+        examples=["550e8400-e29b-41d4-a716-446655440000"],
+    )
+    user_id: UUID = Field(
+        description="UUID of the reviewer",
+        examples=["770e8400-e29b-41d4-a716-446655440002"],
+    )
+    user_name: str = Field(
+        description="Display username of the reviewer",
+        examples=["reviewer01"],
+    )
+    grade: int = Field(
+        description="Numeric grade from 1 (worst) to 10 (best)",
+        examples=[8],
+    )
+    comment: str = Field(
+        description="Written review feedback",
+    )
+    created_date: datetime | None = Field(
+        default=None,
+        description="Timestamp when the review was submitted (UTC)",
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "id": "880e8400-e29b-41d4-a716-446655440003",
+                "document_id": "550e8400-e29b-41d4-a716-446655440000",
+                "user_id": "770e8400-e29b-41d4-a716-446655440002",
+                "grade": 8,
+                "comment": "Well-written policy. Minor formatting nits.",
+                "created_date": "2026-07-02T15:00:00Z",
+            }
+        }
+    }
+
+
+class ReviewListResponse(BaseModel):
+    """Paginated list of reviews for a document."""
+
+    items: list[ReviewResponse] = Field(
+        description="Review records for the current page",
+    )
+    total: int = Field(
+        description="Total number of reviews for the document (across all pages)",
+        examples=[5],
+    )
+    page: int = Field(
+        description="Current page number (1-based)",
+        examples=[1],
+    )
+    page_size: int = Field(
+        description="Number of items per page (1–100)",
+        examples=[20],
+    )
+>>>>>>> Stashed changes

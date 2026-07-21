@@ -11,6 +11,13 @@ export function usePermission() {
         canReview: false,
         canApprove: false,
         canAdmin: false,
+<<<<<<< Updated upstream
+=======
+        canComment: false,
+        canViewReviews: false,
+        canViewRag: false,
+        canManageRag: false,
+>>>>>>> Stashed changes
         canExpire: false,
         roleNames: [] as string[],
       }
@@ -23,6 +30,7 @@ export function usePermission() {
       normalizedRoles.some((role) => roles.includes(role))
 
     return {
+<<<<<<< Updated upstream
       roleNames,
       canUpload: hasAnyRole(["admin", "editor"]),
       canReview: hasAnyRole(["admin", "reviewer"]),
@@ -31,4 +39,38 @@ export function usePermission() {
       canAdmin: normalizedRoles.includes("admin"),
     }
   }, [user])
+=======
+      roleNames: user.roles ?? [],
+      canUpload:
+        hasRole("admin", "editor") ||
+        hasPermission("post:/api/v1/documents/upload"),
+      canReview:
+        hasRole("admin", "reviewer") ||
+        hasPermission("get:/api/v1/approvals/pending"),
+      canApprove:
+        hasRole("admin", "reviewer") ||
+        hasPermission("post:/api/v1/documents/{document_id}/approve"),
+      canAdmin:
+        hasRole("admin") ||
+        hasPermission("get:/api/v1/admin/users"),
+      canComment:
+        hasRole("admin", "reviewer", "viewer") ||
+        hasPermission("post:/api/v1/documents/{document_id}/reviews"),
+      canViewReviews:
+        hasRole("admin", "reviewer", "viewer", "editor") ||
+        hasPermission("get:/api/v1/documents/{document_id}/reviews"),
+      canViewRag:
+        hasRole("admin", "reviewer", "viewer", "editor") ||
+        hasPermission("get:/api/v1/rag/{document_id}/status"),
+      canManageRag:
+        hasPermission(
+          "post:/api/v1/rag/{document_id}",
+          "delete:/api/v1/rag/{document_id}",
+        ),
+      canExpire:
+        hasRole("admin", "reviewer") ||
+        hasPermission("post:/api/v1/documents/{document_id}/expire"),
+    };
+  }, [user]);
+>>>>>>> Stashed changes
 }

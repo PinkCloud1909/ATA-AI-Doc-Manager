@@ -8,6 +8,7 @@ import {
 
 const documents: DocumentItem[] = [
   {
+<<<<<<< Updated upstream
     id: "approved-doc",
     name: "Approved Document",
     category: "Security",
@@ -62,6 +63,29 @@ const documents: DocumentItem[] = [
     icon: "edit_document",
     iconColor: "text-neutral-600",
     bgColor: "bg-neutral-100",
+=======
+    document_id: "approved-doc",
+    document_group_id: "g1",
+    title: "Approved Document",
+    original_filename: "approved.pdf",
+    document_type: "policy",
+    status: "approved",
+    version: 1,
+    review_count: 1,
+    average_review_grade: 8,
+    created_at: "2026-01-01T00:00:00Z",
+  },
+  {
+    document_id: "draft-doc",
+    document_group_id: "g2",
+    title: "Draft Document",
+    original_filename: "draft.pdf",
+    document_type: "manual",
+    status: "draft",
+    version: 1,
+    review_count: 0,
+    created_at: "2026-01-02T00:00:00Z",
+>>>>>>> Stashed changes
   },
 ];
 

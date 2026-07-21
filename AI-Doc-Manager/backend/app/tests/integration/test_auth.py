@@ -4,7 +4,7 @@ import pytest
 def test_successful_register(client):
     response = client.post(
         "/api/v1/auth/register",
-        json={"username": "alice", "password": "alicepass123"},
+        json={"username": "alice", "password": "AlicePass123!"},
     )
 
     assert response.status_code == 201
@@ -16,13 +16,13 @@ def test_successful_register(client):
 def test_register_duplicate_username(client):
     first_response = client.post(
         "/api/v1/auth/register",
-        json={"username": "alice", "password": "alicepass123"},
+        json={"username": "alice", "password": "AlicePass123!"},
     )
     assert first_response.status_code == 201
 
     duplicate_response = client.post(
         "/api/v1/auth/register",
-        json={"username": "alice", "password": "anotherpass123"},
+        json={"username": "alice", "password": "AnotherPass123!"},
     )
 
     assert duplicate_response.status_code == 409
@@ -32,7 +32,7 @@ def test_register_duplicate_username(client):
 def test_successful_login(client):
     response = client.post(
         "/api/v1/auth/login",
-        json={"username": "admin", "password": "admin123"},
+        json={"username": "admin", "password": "Admin123!"},
     )
 
     assert response.status_code == 200
@@ -55,13 +55,13 @@ def test_failed_login(client):
 def test_me_with_valid_token(client):
     register_response = client.post(
         "/api/v1/auth/register",
-        json={"username": "bob", "password": "bobpass123"},
+        json={"username": "bob", "password": "BobPass123!"},
     )
     assert register_response.status_code == 201
 
     login_response = client.post(
         "/api/v1/auth/login",
-        json={"username": "bob", "password": "bobpass123"},
+        json={"username": "bob", "password": "BobPass123!"},
     )
     token = login_response.json()["access_token"]
 

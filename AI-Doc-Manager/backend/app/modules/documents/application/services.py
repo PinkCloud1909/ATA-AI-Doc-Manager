@@ -7,9 +7,15 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.modules.documents.domain.models import Document
+<<<<<<< Updated upstream
 from app.modules.reviews.domain.models import DocumentReview
+=======
+from app.modules.iam.domain.models import User
+from app.modules.reviews.domain.models import DocumentReview
+from app.shared.interfaces import IObjectStorage, IRagEngine
+>>>>>>> Stashed changes
 from app.shared.enums import DocumentType, Status
-from app.shared.utils import utcnow
+from app.shared.utils import safe_filename, utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +81,7 @@ def create_document(
 def create_new_version(
     session: Session,
     document_id: UUID,
+<<<<<<< Updated upstream
     file_link: str,
     user_id: UUID,
     *,
@@ -107,6 +114,72 @@ def create_new_version(
     session.commit()
     session.refresh(new_version)
     return new_version
+=======
+    storage: IObjectStorage,
+) -> tuple[Document, str, str]:
+    document = get_document_by_id(session, document_id)
+    safe_name = safe_filename(document.original_filename)
+    preview_url = storage.generate_presigned_download_url(
+        document.file_link,
+        response_disposition=f'inline; filename="{safe_name}"',
+        content_type=document.content_type,
+    )
+    download_url = storage.generate_presigned_download_url(
+        document.file_link,
+        response_disposition=f'attachment; filename="{safe_name}"',
+        content_type=document.content_type,
+    )
+    return document, preview_url, download_url
+
+
+def get_user_display_names(
+    session: Session,
+    user_ids: set[UUID | None],
+) -> dict[UUID, str]:
+    """Resolve audit user UUIDs to usernames in one query."""
+    resolved_ids = {user_id for user_id in user_ids if user_id is not None}
+    if not resolved_ids:
+        return {}
+    rows = session.execute(
+        select(User.id, User.username).where(User.id.in_(resolved_ids))
+    ).all()
+    return {user_id: username for user_id, username in rows}
+
+
+def get_review_summary(
+    session: Session,
+    document_id: UUID,
+) -> tuple[float | None, int]:
+    """Return the average grade and review count for a document."""
+    average, count = session.execute(
+        select(func.avg(DocumentReview.grade), func.count(DocumentReview.id)).where(
+            DocumentReview.document_id == document_id
+        )
+    ).one()
+    return (round(float(average), 2) if average is not None else None, int(count))
+
+
+def get_review_summaries(
+    session: Session,
+    document_ids: set[UUID],
+) -> dict[UUID, tuple[float, int]]:
+    """Return review averages and counts for a page of documents in one query."""
+    if not document_ids:
+        return {}
+    rows = session.execute(
+        select(
+            DocumentReview.document_id,
+            func.avg(DocumentReview.grade),
+            func.count(DocumentReview.id),
+        )
+        .where(DocumentReview.document_id.in_(document_ids))
+        .group_by(DocumentReview.document_id)
+    ).all()
+    return {
+        document_id: (round(float(average), 2), int(count))
+        for document_id, average, count in rows
+    }
+>>>>>>> Stashed changes
 
 
 def update_document_metadata(
@@ -316,6 +389,7 @@ def list_pending_approvals(session: Session) -> list[Document]:
     )
 
 
+<<<<<<< Updated upstream
 def average_grade(session: Session, document_id: UUID) -> float | None:
     value = session.execute(
         select(func.avg(DocumentReview.grade)).where(
@@ -323,3 +397,27 @@ def average_grade(session: Session, document_id: UUID) -> float | None:
         )
     ).scalar_one_or_none()
     return float(value) if value is not None else None
+=======
+def expire_document(
+    session: Session,
+    document_id: UUID,
+    user_id: UUID,
+) -> Document:
+    """Mark an approved document as expired."""
+    document = get_document_by_id(session, document_id)
+    if document.status != Status.APPROVED:
+        raise ConflictError("Only approved documents can be marked as expired")
+
+    now = utcnow()
+    document.status = Status.EXPIRED
+    document.modified_by = user_id
+    document.modified_date = now
+    session.commit()
+    logger.info("document_expired", extra={"document_id": str(document_id)})
+    return document
+
+
+def average_grade(session: Session, document_id: UUID) -> float | None:
+    value, _ = get_review_summary(session, document_id)
+    return value
+>>>>>>> Stashed changes

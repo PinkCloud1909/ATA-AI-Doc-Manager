@@ -4,6 +4,15 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings, get_settings
 from app.core.security import get_password_hash
 from app.modules.iam.domain.models import Privilege, Role, User, UserRole
+<<<<<<< Updated upstream
+=======
+from app.modules.iam.domain.permissions import (
+    ROLE_EDITOR,
+    ROLE_REVIEWER,
+    ROLE_VIEWER,
+)
+from app.modules.iam.domain.password_policy import validate_password_policy
+>>>>>>> Stashed changes
 from app.shared.utils import utcnow
 
 SELF_SERVICE_PRIVILEGES = [
@@ -64,11 +73,21 @@ ADMIN_PRIVILEGES = [
     "GET:/ready",
     "POST:/api/v1/auth/login",
     "POST:/api/v1/auth/register",
+<<<<<<< Updated upstream
     *EDITOR_PRIVILEGES,
     *REVIEWER_PRIVILEGES,
+=======
+    "GET:/api/v1/auth/me",
+    "POST:/api/v1/auth/change-password",
+    "POST:/api/v1/documents/upload",
+    "GET:/api/v1/documents",
+    "GET:/api/v1/documents/{document_id}",
+    "PUT:/api/v1/documents/{document_id}",
+>>>>>>> Stashed changes
     "DELETE:/api/v1/documents/{document_id}",
     "DELETE:/api/v1/documents/{document_id}/permanent",
     "GET:/api/v1/admin/roles",
+<<<<<<< Updated upstream
     "GET:/api/v1/admin/users",
     "POST:/api/v1/admin/users",
     "PUT:/api/v1/admin/users/{user_id}/roles",
@@ -79,6 +98,58 @@ ROLE_PRIVILEGES = {
     "viewer": VIEWER_PRIVILEGES,
     "editor": EDITOR_PRIVILEGES,
     "reviewer": REVIEWER_PRIVILEGES,
+=======
+    "POST:/api/v1/admin/users/{user_id}/reset-password",
+]
+DEFAULT_USER_PRIVILEGES = [
+    "GET:/api/v1/auth/me",
+    "POST:/api/v1/auth/change-password",
+]
+
+# --- Per-role privilege definitions ---
+
+VIEWER_PRIVILEGES = [
+    "GET:/api/v1/auth/me",
+    "POST:/api/v1/auth/change-password",
+    "GET:/api/v1/documents",
+    "GET:/api/v1/documents/{document_id}",
+    "POST:/api/v1/documents/{document_id}/reviews",
+    "GET:/api/v1/documents/{document_id}/reviews",
+    "GET:/api/v1/rag/{document_id}/status",
+]
+
+EDITOR_PRIVILEGES = [
+    "GET:/api/v1/auth/me",
+    "POST:/api/v1/auth/change-password",
+    "GET:/api/v1/documents",
+    "GET:/api/v1/documents/{document_id}",
+    "POST:/api/v1/documents/upload",
+    "PUT:/api/v1/documents/{document_id}",
+    "POST:/api/v1/documents/{document_id}/new-version",
+    "POST:/api/v1/documents/{document_id}/submit",
+    "GET:/api/v1/documents/{document_id}/reviews",
+    "GET:/api/v1/rag/{document_id}/status",
+]
+
+REVIEWER_PRIVILEGES = [
+    "GET:/api/v1/auth/me",
+    "POST:/api/v1/auth/change-password",
+    "GET:/api/v1/documents",
+    "GET:/api/v1/documents/{document_id}",
+    "GET:/api/v1/approvals/pending",
+    "POST:/api/v1/documents/{document_id}/approve",
+    "POST:/api/v1/documents/{document_id}/reject",
+    "POST:/api/v1/documents/{document_id}/reviews",
+    "GET:/api/v1/documents/{document_id}/reviews",
+    "GET:/api/v1/rag/{document_id}/status",
+    "POST:/api/v1/documents/{document_id}/expire",
+]
+
+ROLE_PRIVILEGES: dict[str, list[str]] = {
+    ROLE_VIEWER: VIEWER_PRIVILEGES,
+    ROLE_EDITOR: EDITOR_PRIVILEGES,
+    ROLE_REVIEWER: REVIEWER_PRIVILEGES,
+>>>>>>> Stashed changes
 }
 
 
@@ -169,6 +240,7 @@ def seed_iam_data(
         select(User).where(User.username == settings.default_admin_username)
     ).scalar_one_or_none()
     if user is None:
+        validate_password_policy(settings.default_admin_password)
         user = User(
             username=settings.default_admin_username,
             password_hash=get_password_hash(settings.default_admin_password),

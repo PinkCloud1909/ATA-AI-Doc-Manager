@@ -1,5 +1,6 @@
 "use client"
 
+<<<<<<< Updated upstream
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
 import { approvalsApi } from "@/lib/api/approvals"
@@ -16,6 +17,17 @@ export default function ApprovalsPage() {
     queryKey: ["approvals", "queue"],
     queryFn: approvalsApi.getPendingQueue,
   })
+=======
+import { useTranslation, formatT } from "@/i18n/LanguageContext";
+import { usePendingApprovals } from "@/hooks/useDocuments";
+import { StatusBadge } from "@/components/documents/StatusBadge";
+import { ApprovalActions } from "@/components/approvals/ApprovalActions";
+import Link from "next/link";
+
+export default function ApprovalsPage() {
+  const { t } = useTranslation();
+  const { data: queue, isLoading } = usePendingApprovals();
+>>>>>>> Stashed changes
 
   return (
     <div className="min-w-0 space-y-6">
@@ -55,20 +67,34 @@ export default function ApprovalsPage() {
                     href={`/documents/${doc.id}`}
                     className="block truncate text-sm font-medium text-slate-800 hover:text-blue-600"
                   >
+<<<<<<< Updated upstream
                     {doc.title || doc.original_filename}
                   </Link>
                   <p className="mt-0.5 text-xs text-slate-400">
                     v{doc.version} · {doc.created_by_name || "admin"} ·{" "}
                     {new Date(doc.created_at).toLocaleDateString("vi-VN")}
+=======
+                    {doc.title}
+                  </Link>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    v{doc.version} · {doc.submitted_by_name ?? doc.created_by_name ?? "Unknown user"} ·{" "}
+                    {doc.submitted_at
+                      ? new Date(doc.submitted_at).toLocaleDateString("vi-VN")
+                      : ""}
+>>>>>>> Stashed changes
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
                   <StatusBadge status={doc.status} />
                   <ApprovalActions
+<<<<<<< Updated upstream
                     documentId={doc.id}
                     showSubmit={false}
                     showApprove
                     onDone={() => refetch()}
+=======
+                    documentId={doc.document_id}
+>>>>>>> Stashed changes
                   />
                 </div>
               </li>

@@ -4,6 +4,7 @@
 import sys
 
 from app.core.db import Base, get_engine
+from app.modules import model_registry as _model_registry  # noqa: F401
 
 
 def setup_database() -> int:

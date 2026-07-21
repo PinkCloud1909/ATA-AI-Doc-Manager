@@ -1,5 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+<<<<<<< Updated upstream
+=======
+  turbopack: {
+    root: process.cwd(),
+  },
+  // "standalone" tạo ra bundle tối ưu cho Cloud Run
+>>>>>>> Stashed changes
   output: "standalone",
 
   images: {
@@ -37,6 +44,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https://storage.googleapis.com",
+              "frame-src 'self' https://storage.googleapis.com https://docs.google.com",
               "connect-src 'self' https://*.googleapis.com wss: ws:",
             ].join("; "),
           },

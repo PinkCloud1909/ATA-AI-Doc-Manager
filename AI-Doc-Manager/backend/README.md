@@ -185,7 +185,7 @@ python scripts/seed.py
 Default credentials:
 
 - Username: `admin`
-- Password: `admin123`
+- Password: `Admin123!`
 
 ## Testing
 
@@ -216,7 +216,7 @@ Login:
 ```bash
 curl -X POST http://localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin123"}'
+  -d '{"username":"admin","password":"Admin123!"}'
 ```
 
 Register:

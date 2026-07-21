@@ -2,6 +2,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from sqlalchemy.orm import joinedload
 
 from app.core.exceptions import ConflictError, ValidationError
 from app.modules.documents.application.services import get_document_by_id
@@ -43,6 +44,7 @@ def list_reviews(session: Session, document_id: UUID) -> list[DocumentReview]:
     return (
         session.execute(
             select(DocumentReview)
+            .options(joinedload(DocumentReview.user))
             .where(DocumentReview.document_id == document_id)
             .order_by(DocumentReview.created_date.desc())
         )

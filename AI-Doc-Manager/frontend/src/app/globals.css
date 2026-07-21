@@ -9,8 +9,15 @@
 /* ─── CSS Variables & Base Reset ────────────────────────────────────────────── */
 @layer base {
   :root {
+<<<<<<< Updated upstream
     --font-sans: 'DM Sans', system-ui, sans-serif;
     --font-mono: 'DM Mono', 'Fira Code', monospace;
+=======
+    --font-inter: var(--font-noto-sans), Arial, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-manrope: var(--font-noto-sans), Arial, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-sans: var(--font-inter);
+    --font-mono: "DM Mono", "Fira Code", ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+>>>>>>> Stashed changes
   }
 
   html {

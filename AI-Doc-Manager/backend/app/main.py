@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.db import get_db_session, ping_database
+from app.modules import model_registry as _model_registry  # noqa: F401
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import clear_request_id, configure_logging, set_request_id
 from app.modules.documents.api.router import approvals_router, documents_router

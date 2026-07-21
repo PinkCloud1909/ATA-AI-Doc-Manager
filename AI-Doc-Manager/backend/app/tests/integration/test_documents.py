@@ -16,7 +16,7 @@ MOCK_DOWNLOAD_URL = "http://localhost:9000/documents/documents/2026/05/01/abc123
 def _login_admin(client) -> str:
     response = client.post(
         "/api/v1/auth/login",
-        json={"username": "admin", "password": "admin123"},
+        json={"username": "admin", "password": "Admin123!"},
     )
     assert response.status_code == 200
     return response.json()["access_token"]

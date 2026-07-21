@@ -1,9 +1,19 @@
+<<<<<<< Updated upstream
 "use client";
 
 import { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 
+=======
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { useAuth } from "@/hooks/useAuth";
+import { validatePassword } from "@/lib/validation";
+
+>>>>>>> Stashed changes
 export default function RegisterPage() {
   // Giả định bạn có hàm register trong useAuth
   // Nếu chưa có, bạn cần thêm hàm này vào file useAuth.ts nhé
@@ -17,6 +27,26 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError("");
+<<<<<<< Updated upstream
+=======
+    const normalizedUsername = username.trim();
+
+    if (normalizedUsername.length < 3) {
+      setLocalError("Tên đăng nhập phải có ít nhất 3 ký tự.");
+      return;
+    }
+
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      setLocalError(passwordError);
+      return;
+    }
+
+    if (password.length < 8) {
+      setLocalError("Mật khẩu phải có ít nhất 8 ký tự.");
+      return;
+    }
+>>>>>>> Stashed changes
 
     if (password !== confirmPassword) {
       setLocalError("Mật khẩu xác nhận không khớp.");
@@ -102,6 +132,12 @@ export default function RegisterPage() {
                 id="password"
                 type="password"
                 required
+<<<<<<< Updated upstream
+=======
+                minLength={8}
+                maxLength={128}
+                autoComplete="new-password"
+>>>>>>> Stashed changes
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
@@ -125,6 +161,12 @@ export default function RegisterPage() {
                 id="confirm-password"
                 type="password"
                 required
+<<<<<<< Updated upstream
+=======
+                minLength={8}
+                maxLength={128}
+                autoComplete="new-password"
+>>>>>>> Stashed changes
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="••••••••"

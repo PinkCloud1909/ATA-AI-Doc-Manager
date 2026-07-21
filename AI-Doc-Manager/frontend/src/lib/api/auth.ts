@@ -7,6 +7,7 @@ import {
 } from "@/lib/auth/firebase"
 import { mockLogin, mockMe } from "./auth.mock"
 
+<<<<<<< Updated upstream
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === "true"
 const USE_FIREBASE = Boolean(process.env.NEXT_PUBLIC_FIREBASE_API_KEY)
 
@@ -24,6 +25,17 @@ async function loginWithBackend(username: string, password: string): Promise<Use
   const { data: me } = await apiClient.get<User>("/auth/me")
   return me
 }
+=======
+import apiClient from "./client";
+import { setStoredAccessToken, clearStoredAccessToken } from "./authToken";
+import type {
+  LoginRequest,
+  RegisterRequest,
+  TokenResponse,
+  MeResponse,
+  PasswordChangeResponse,
+} from "@/types/user";
+>>>>>>> Stashed changes
 
 export const authApi = {
   login: async (username: string, password: string): Promise<User> => {
@@ -49,6 +61,28 @@ export const authApi = {
     }
   },
 
+<<<<<<< Updated upstream
+=======
+  /** Register a new account. Returns profile directly (no auto-login). */
+  register: async (username: string, password: string): Promise<MeResponse> => {
+    const payload: RegisterRequest = { username: username.trim(), password };
+    const { data } = await apiClient.post<MeResponse>("/auth/register", payload);
+    return data;
+  },
+
+  changePassword: async (
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<PasswordChangeResponse> => {
+    const { data } = await apiClient.post<PasswordChangeResponse>(
+      "/auth/change-password",
+      { current_password: currentPassword, new_password: newPassword },
+    );
+    return data;
+  },
+
+  /** Logout — clears stored JWT. */
+>>>>>>> Stashed changes
   logout: async (): Promise<void> => {
     try {
       await apiClient.post("/auth/logout")

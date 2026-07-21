@@ -29,7 +29,7 @@ def _create_document(db_session, *, group_id, version, status, created_by):
 def _login_admin(client):
     response = client.post(
         "/api/v1/auth/login",
-        json={"username": "admin", "password": "admin123"},
+        json={"username": "admin", "password": "Admin123!"},
     )
     return response.json()["access_token"]
 

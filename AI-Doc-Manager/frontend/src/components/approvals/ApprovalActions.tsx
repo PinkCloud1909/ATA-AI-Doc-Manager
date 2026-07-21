@@ -1,5 +1,6 @@
 "use client"
 
+<<<<<<< Updated upstream
 import { useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
@@ -125,4 +126,28 @@ export function ApprovalActions({
       )}
     </>
   )
+=======
+import Link from "next/link";
+import { useTranslation } from "@/i18n/LanguageContext";
+
+interface Props {
+  documentId: string;
+}
+
+/**
+ * Approval decisions are completed on the document review screen so a
+ * reviewer reads the source and supplies the required score and comment.
+ */
+export function ApprovalActions({ documentId }: Props) {
+  const { t } = useTranslation();
+  return (
+    <Link
+      href={`/documents/${documentId}?tab=reviews`}
+      className="inline-flex items-center gap-1.5 rounded-lg bg-tertiary px-3 py-1.5 text-sm font-bold text-on-tertiary transition-colors hover:bg-tertiary-dim"
+    >
+      <span className="material-symbols-outlined text-[17px]">rate_review</span>
+      {t.documents.detail.reviews}
+    </Link>
+  );
+>>>>>>> Stashed changes
 }

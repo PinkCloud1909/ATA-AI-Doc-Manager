@@ -76,9 +76,19 @@ export function useCreateReview(documentId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ grade, comment }: { grade: number; comment: string }) =>
+<<<<<<< Updated upstream
       documentsApi.createReview(documentId, grade, comment),
     onSuccess: () => qc.invalidateQueries({ queryKey: documentKeys.detail(documentId) }),
   })
+=======
+      reviewsApi.create(documentId, grade, comment),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: reviewKeys.list(documentId) });
+      qc.invalidateQueries({ queryKey: documentKeys.detail(documentId) });
+      qc.invalidateQueries({ queryKey: documentKeys.lists() });
+    },
+  });
+>>>>>>> Stashed changes
 }
 
 export function useDownloadUrl(documentId: string, enabled = false) {

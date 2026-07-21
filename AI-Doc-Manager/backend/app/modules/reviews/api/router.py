@@ -76,6 +76,7 @@ def add_review(
         id=review.id,
         document_id=review.document_id,
         user_id=review.user_id,
+        user_name=current_user.username,
         grade=review.grade,
         comment=review.comment,
         created_date=review.created_date,
@@ -91,6 +92,7 @@ def get_reviews(
     document_id: UUID,
     current_user: Annotated[AuthenticatedUser, Depends(require_permission())],
     session: Annotated[Session, Depends(get_db_session)],
+<<<<<<< Updated upstream
 ) -> list[ReviewResponse]:
     _ensure_can_view_document(current_user, session, document_id)
     reviews = list_reviews(session, document_id=document_id)
@@ -128,3 +130,31 @@ def get_all_reviews(
         )
         for review in reviews
     ]
+=======
+    page: int = Query(default=1, ge=1, description="Page number (1-based)"),
+    page_size: int = Query(default=20, ge=1, le=100, description="Items per page (1–100)"),
+) -> ReviewListResponse:
+    reviews, total = list_reviews(
+        session,
+        document_id=document_id,
+        page=page,
+        page_size=page_size,
+    )
+    return ReviewListResponse(
+        items=[
+            ReviewResponse(
+                id=review.id,
+                document_id=review.document_id,
+                user_id=review.user_id,
+                user_name=review.user.username if review.user else "Unknown user",
+                grade=review.grade,
+                comment=review.comment,
+                created_date=review.created_date,
+            )
+            for review in reviews
+        ],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
+>>>>>>> Stashed changes

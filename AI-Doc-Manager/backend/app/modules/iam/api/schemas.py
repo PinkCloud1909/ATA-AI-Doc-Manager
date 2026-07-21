@@ -13,6 +13,7 @@ class RegisterRequest(BaseModel):
     username: str = Field(min_length=3, max_length=100)
     password: str = Field(min_length=8, max_length=255)
 
+<<<<<<< Updated upstream
 
 class AdminUserCreateRequest(BaseModel):
     username: str = Field(min_length=3, max_length=100)
@@ -22,6 +23,48 @@ class AdminUserCreateRequest(BaseModel):
 
 class AssignRolesRequest(BaseModel):
     role_names: list[str] = Field(min_length=1)
+=======
+    username: str = Field(
+        min_length=3,
+        max_length=100,
+        description="Desired username (3–100 characters, unique across the system)",
+        examples=["jdoe"],
+    )
+    password: str = Field(
+        min_length=8,
+        max_length=128,
+        description=(
+            "Account password. Must include uppercase, lowercase, number, "
+            "special character, and no whitespace."
+        ),
+        examples=["SecurePass1!"],
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {"username": "jdoe", "password": "SecurePass1!"}
+        }
+    }
+>>>>>>> Stashed changes
+
+
+class ChangePasswordRequest(BaseModel):
+    """Authenticated password-change payload."""
+
+    current_password: str = Field(min_length=1, max_length=255)
+    new_password: str = Field(
+        min_length=8,
+        max_length=128,
+        description=(
+            "New password with uppercase, lowercase, number, special character, "
+            "and no whitespace."
+        ),
+        examples=["NewSecurePass1!"],
+    )
+
+
+class PasswordChangeResponse(BaseModel):
+    detail: str
 
 
 class TokenResponse(BaseModel):
